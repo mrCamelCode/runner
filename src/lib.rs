@@ -13,7 +13,7 @@ use thomas::{
 pub fn run() {
     Game::new(GameOptions {
         max_frame_rate: 60,
-        press_escape_to_quit: false,
+        press_escape_to_quit: true,
     })
     .add_systems_from_generator(PlayerSystemsGenerator {})
     .add_systems_from_generator(WorldSystemsGenerator {})
@@ -24,6 +24,6 @@ pub fn run() {
         screen_resolution: Dimensions2d::new(SCREEN_HEIGHT as u64, SCREEN_WIDTH as u64),
         include_default_camera: true,
         default_foreground_color: None,
-        default_background_color: None,
+        default_background_color: Some(SKY_COLOR),
     }));
 }

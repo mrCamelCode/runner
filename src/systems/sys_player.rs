@@ -110,7 +110,7 @@ fn make_player(_: Vec<QueryResultList>, commands: GameCommandsArg) {
             display: PLAYER_DISPLAY,
             layer: Layer::base(),
             background_color: None,
-            foreground_color: None,
+            foreground_color: Some(Rgb::white()),
         }),
         Box::new(TerminalCollider {
             is_active: true,

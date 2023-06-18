@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use thomas::{
     Dimensions2d, GameCommand, GameCommandsArg, IntCoords2d, Layer, Matrix, QueryResultList, Rgb,
     System, SystemsGenerator, TerminalCollider, TerminalRenderer, TerminalTransform, EVENT_INIT,
@@ -17,24 +19,23 @@ impl SystemsGenerator for WorldSystemsGenerator {
 }
 
 fn make_ground(_: Vec<QueryResultList>, commands: GameCommandsArg) {
-    // Ground player actually stands on.
+    make_real_ground(Rc::clone(&commands));
+    make_decorative_ground(Rc::clone(&commands));
+}
+
+fn make_real_ground(commands: GameCommandsArg) {
     commands.borrow_mut().issue(GameCommand::AddEntity(vec![
         Box::new(TerminalTransform {
             coords: IntCoords2d::new(PLAYER_X_OFFSET, SCREEN_HEIGHT as i64 - PLAYER_Y_OFFSET),
-        }),
-        Box::new(TerminalRenderer {
-            display: ' ',
-            layer: Layer::below(&Layer::base()),
-            background_color: None,
-            foreground_color: None,
         }),
         Box::new(TerminalCollider {
             is_active: true,
             layer: GROUND_COLLISION_LAYER,
         }),
     ]));
+}
 
-    // Decorative ground.
+fn make_decorative_ground(commands: GameCommandsArg) {
     let ground_fill_matrix = Matrix::new(
         Dimensions2d::new(PLAYER_Y_OFFSET as u64, SCREEN_WIDTH as u64),
         || (),
