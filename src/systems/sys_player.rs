@@ -1,12 +1,13 @@
 use thomas::{
     GameCommand, GameCommandsArg, Input, IntCoords2d, Keycode, Layer, Priority, Query,
-    QueryResultList, System, SystemsGenerator, TerminalCollider, TerminalCollision,
-    TerminalRenderer, TerminalTransform, Timer, EVENT_INIT, EVENT_UPDATE, Rgb,
+    QueryResultList, Rgb, System, SystemsGenerator, TerminalCollider, TerminalCollision,
+    TerminalRenderer, TerminalTransform, Timer, EVENT_INIT, EVENT_UPDATE,
 };
 
 use crate::{
-    components::Player, GROUND_COLLISION_LAYER, OBSTACLE_COLLISION_LAYER, PLAYER_COLLISION_LAYER,
-    PLAYER_DISPLAY, PLAYER_X_OFFSET, PLAYER_Y_OFFSET, SCREEN_HEIGHT,
+    components::{Player, SkylineBuilding},
+    BUILDING_COLOR, GROUND_COLLISION_LAYER, OBSTACLE_COLLISION_LAYER, PLAYER_COLLISION_LAYER,
+    PLAYER_DISPLAY, PLAYER_X_OFFSET, PLAYER_Y_OFFSET, SCREEN_HEIGHT, SKY_COLOR,
 };
 
 const JUMP_WAIT_TIME_MILLIS: u128 = 100;
