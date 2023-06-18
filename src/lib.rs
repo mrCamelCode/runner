@@ -6,6 +6,9 @@ use systems::*;
 
 mod components;
 
+mod prefabs;
+pub use prefabs::*;
+
 use thomas::{
     Dimensions2d, Game, GameCommand, GameOptions, Renderer, System, TerminalRendererOptions,
 };

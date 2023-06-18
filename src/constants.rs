@@ -13,3 +13,5 @@ pub const GROUND_COLLISION_LAYER: Layer = Layer(2);
 pub const OBSTACLE_COLLISION_LAYER: Layer = Layer(3);
 
 pub const SKY_COLOR: Rgb = Rgb(77, 183, 201);
+
+pub const BUILDING_COLOR: Rgb = Rgb(143, 143, 143);
