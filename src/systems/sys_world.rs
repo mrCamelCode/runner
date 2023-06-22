@@ -11,7 +11,7 @@ use crate::{
     add_building,
     components::{SkylineBuilding, TimeOfDay, WorldTime, NOON_TIME, SUNRISE_TIME, SUNSET_TIME},
     get_color, GROUND_COLLISION_LAYER, PLAYER_X_OFFSET, PLAYER_Y_OFFSET, SCREEN_HEIGHT,
-    SCREEN_WIDTH, SKY_COLORS, STAR_COLORS, STAR_DISPLAY, STAR_LAYER, STAR_NAME, SUN_ID,
+    SCREEN_WIDTH, SKY_COLORS, STAR_COLORS, STAR_DISPLAY, STAR_LAYER, STAR_NAME, SUN_ID, SUN_LAYER,
     SUN_PIECE_NAME,
 };
 
@@ -35,27 +35,6 @@ impl SystemsGenerator for WorldSystemsGenerator {
             (EVENT_INIT, System::new(vec![], make_skyline)),
             (EVENT_INIT, System::new(vec![], make_stars)),
             (EVENT_INIT, System::new(vec![], make_sun)),
-            // (
-            //     EVENT_BEFORE_UPDATE,
-            //     System::new(
-            //         vec![
-            //             Query::new().has::<TerminalRendererState>(),
-            //             Query::new().has::<WorldTime>(),
-            //         ],
-            //         |results, _| {
-            //             if let [state_results, world_time_results, ..] = &results[..] {
-            //                 let mut state = state_results.get_only_mut::<TerminalRendererState>();
-
-            //                 if state.options.default_background_color.is_none() {
-            //                     let world_time = world_time_results.get_only::<WorldTime>();
-
-            //                     state.options.default_background_color =
-            //                         *get_color(&SKY_COLORS, &world_time.time_of_day());
-            //                 }
-            //             }
-            //         },
-            //     ),
-            // ),
             (
                 EVENT_UPDATE,
                 System::new(vec![Query::new().has::<WorldTime>()], update_world_time),
@@ -107,7 +86,7 @@ fn make_sun(_: Vec<QueryResultList>, commands: GameCommandsArg) {
             display: ' ',
             background_color: Some(Rgb::yellow()),
             foreground_color: None,
-            layer: Layer::base(),
+            layer: SUN_LAYER,
         }),
         Box::new(TerminalTransform {
             coords: IntCoords2d::zero(),
@@ -122,7 +101,7 @@ fn make_sun(_: Vec<QueryResultList>, commands: GameCommandsArg) {
             display: ' ',
             background_color: Some(Rgb::yellow()),
             foreground_color: None,
-            layer: Layer::base(),
+            layer: SUN_LAYER,
         }),
         Box::new(TerminalTransform {
             coords: IntCoords2d::zero(),
@@ -259,30 +238,31 @@ fn update_world_colors_from_time(results: Vec<QueryResultList>, _: GameCommandsA
         let current_sky_color_option = terminal_renderer_state.options.default_background_color;
         let target_sky_color_option = get_color(&SKY_COLORS, &time_of_day);
 
-        // if current_sky_color_option.is_none() && target_sky_color_option.is_some() {
-        //     terminal_renderer_state.options.default_background_color = *target_sky_color_option;
-        // } else {
-            terminal_renderer_state.options.default_background_color = blend_color_to_target(
-                &current_sky_color_option,
-                target_sky_color_option,
-                world_time
-                    .color_transition_timers
-                    .get_mut(SKY_COLOR_TRANSITION_TIMER_NAME)
-                    .unwrap(),
-            );
-        // }
+        terminal_renderer_state.options.default_background_color = blend_color_to_target(
+            &current_sky_color_option,
+            target_sky_color_option,
+            world_time
+                .color_transition_timers
+                .get_mut(SKY_COLOR_TRANSITION_TIMER_NAME)
+                .unwrap(),
+        );
 
         for star_result in stars_results {
             let mut renderer = star_result.components().get_mut::<TerminalRenderer>();
 
             let current_color_option = renderer.foreground_color;
-            let target_color_option = if let Some(target_color) = get_color(&STAR_COLORS, &time_of_day) {
+            let target_star_color_option = get_color(&STAR_COLORS, &time_of_day);
+            let target_color_option = if let Some(target_color) = target_star_color_option {
                 Some(*target_color)
             } else {
                 *target_sky_color_option
             };
 
-            renderer.display = if target_color_option.is_none() { ' ' } else { STAR_DISPLAY };
+            renderer.display = if target_star_color_option.is_none() {
+                ' '
+            } else {
+                STAR_DISPLAY
+            };
 
             renderer.foreground_color = blend_color_to_target(
                 &current_color_option,
@@ -354,21 +334,25 @@ fn update_sun_position(results: Vec<QueryResultList>, _: GameCommandsArg) {
 }
 
 fn get_sun_x(current_time: u8) -> i64 {
-    if current_time < SUNRISE_TIME || current_time > SUNSET_TIME {
+    if current_time <= SUNRISE_TIME || current_time > SUNSET_TIME {
         -100
     } else {
-        (SCREEN_WIDTH
-            * ((current_time as u16 - SUNRISE_TIME as u16)
-                / (SUNSET_TIME as u16 - SUNRISE_TIME as u16))) as i64
+        f64::round(
+            SCREEN_WIDTH as f64
+                * ((current_time as f64 - SUNRISE_TIME as f64)
+                    / (SUNSET_TIME as f64 - SUNRISE_TIME as f64)),
+        ) as i64
     }
 }
 
 fn get_sun_y(current_time: u8) -> i64 {
-    if current_time < SUNRISE_TIME || current_time > SUNSET_TIME {
+    if current_time <= SUNRISE_TIME || current_time > SUNSET_TIME {
         -100
     } else {
-        ((SCREEN_HEIGHT as i64 - 2) / (NOON_TIME as i64 - SUNRISE_TIME as i64).pow(2))
-            * (current_time as i64 - NOON_TIME as i64).pow(2)
-            + 1
+        f64::round(
+            ((SCREEN_HEIGHT as f64 - 2.0) / (NOON_TIME as f64 - SUNRISE_TIME as f64).powf(2.0))
+                * (current_time as f64 - NOON_TIME as f64).powf(2.0)
+                + 1.0,
+        ) as i64
     }
 }

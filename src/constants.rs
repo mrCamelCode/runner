@@ -5,7 +5,8 @@ use crate::components::TimeOfDay;
 pub type TimeOfDayColors = [(TimeOfDay, Option<Rgb>); 7];
 
 pub const SKYLINE_LAYER: Layer = Layer(-1);
-pub const STAR_LAYER: Layer = Layer(-2);
+pub const STAR_LAYER: Layer = Layer(-3);
+pub const SUN_LAYER: Layer = Layer(-2);
 
 pub const SCREEN_HEIGHT: u16 = 10;
 pub const SCREEN_WIDTH: u16 = 80;
