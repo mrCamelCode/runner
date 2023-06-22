@@ -3,7 +3,7 @@ use thomas::{
     TerminalRenderer, TerminalTransform,
 };
 
-use crate::{PLAYER_Y_OFFSET, SCREEN_HEIGHT, BUILDING_COLOR};
+use crate::{PLAYER_Y_OFFSET, SCREEN_HEIGHT, BUILDING_COLOR, SKYLINE_LAYER};
 
 pub fn add_building(commands: GameCommandsArg, x_coord: i64, size: Dimensions2d) {
     let building_shape_matrix = Matrix::new(size, || ());
@@ -14,7 +14,7 @@ pub fn add_building(commands: GameCommandsArg, x_coord: i64, size: Dimensions2d)
         commands.borrow_mut().issue(GameCommand::AddEntity(vec![
             Box::new(TerminalRenderer {
                 display: ' ',
-                layer: Layer::above(&Layer::furthest_background()),
+                layer: SKYLINE_LAYER,
                 foreground_color: None,
                 background_color: Some(BUILDING_COLOR),
             }),

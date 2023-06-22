@@ -1,6 +1,4 @@
-use thomas::Component;
+use thomas::{Component};
 
 #[derive(Component)]
-pub struct SkylineBuilding {
-
-}
+pub struct SkylineBuilding {}
