@@ -44,6 +44,15 @@ pub const SKY_COLORS: TimeOfDayColors = [
     (TimeOfDay::Evening, Some(Rgb(46, 58, 97))),
     (TimeOfDay::Dusk, Some(Rgb(7, 51, 92))),
 ];
+pub const SUN_COLORS: TimeOfDayColors = [
+    (TimeOfDay::Night, Some(Rgb(23, 32, 59))),
+    (TimeOfDay::Dawn, Some(Rgb(166, 39, 0))),
+    (TimeOfDay::Morning, Some(Rgb(224, 166, 4))),
+    (TimeOfDay::Noon, Some(Rgb(252, 186, 3))),
+    (TimeOfDay::Afternoon, Some(Rgb(252, 186, 3))),
+    (TimeOfDay::Evening, Some(Rgb(191, 110, 4))),
+    (TimeOfDay::Dusk, Some(Rgb(166, 39, 0))),
+];
 pub const BUILDING_COLOR: Rgb = Rgb(143, 143, 143);
 
 pub fn get_color<'a>(colors: &'a TimeOfDayColors, time_of_day: &TimeOfDay) -> &'a Option<Rgb> {

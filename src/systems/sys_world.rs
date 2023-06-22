@@ -1,26 +1,27 @@
-use std::{collections::HashMap, rc::Rc, thread::current};
+use std::{collections::HashMap, rc::Rc};
 
 use rand::{thread_rng, Rng};
 use thomas::{
     Dimensions2d, GameCommand, GameCommandsArg, Identity, IntCoords2d, Layer, Lerp, Matrix, Query,
     QueryResultList, Rgb, System, SystemsGenerator, TerminalCollider, TerminalRenderer,
-    TerminalRendererState, TerminalTransform, Timer, EVENT_BEFORE_UPDATE, EVENT_INIT, EVENT_UPDATE,
+    TerminalRendererState, TerminalTransform, Timer, EVENT_INIT, EVENT_UPDATE,
 };
 
 use crate::{
     add_building,
-    components::{SkylineBuilding, TimeOfDay, WorldTime, NOON_TIME, SUNRISE_TIME, SUNSET_TIME},
+    components::{SkylineBuilding, WorldTime, NOON_TIME, SUNRISE_TIME, SUNSET_TIME},
     get_color, GROUND_COLLISION_LAYER, PLAYER_X_OFFSET, PLAYER_Y_OFFSET, SCREEN_HEIGHT,
-    SCREEN_WIDTH, SKY_COLORS, STAR_COLORS, STAR_DISPLAY, STAR_LAYER, STAR_NAME, SUN_ID, SUN_LAYER,
-    SUN_PIECE_NAME,
+    SCREEN_WIDTH, SKY_COLORS, STAR_COLORS, STAR_DISPLAY, STAR_LAYER, STAR_NAME, SUN_COLORS, SUN_ID,
+    SUN_LAYER, SUN_PIECE_NAME,
 };
 
 const GROUND_COLOR: Rgb = Rgb(94, 153, 84);
 const ADVANCE_TIME_WAIT_TIME_MILLIS: u128 = 1000;
 
-const COLOR_TRANSITION_TIME_MILLIS: u128 = 1500;
+const COLOR_TRANSITION_TIME_MILLIS: u128 = 800;
 const SKY_COLOR_TRANSITION_TIMER_NAME: &str = "sky-color";
 const STAR_COLOR_TRANSITION_TIMER_NAME: &str = "star-color";
+const SUN_COLOR_TRANSITION_TIMER_NAME: &str = "sun-color";
 
 const AVAILABLE_BACKGROUND_HEIGHT: u64 = SCREEN_HEIGHT as u64 - PLAYER_Y_OFFSET as u64;
 
@@ -47,6 +48,9 @@ impl SystemsGenerator for WorldSystemsGenerator {
                         Query::new().has::<TerminalRendererState>(),
                         Query::new()
                             .has_where::<Identity>(|identity| identity.name == STAR_NAME)
+                            .has::<TerminalRenderer>(),
+                        Query::new()
+                            .has_where::<Identity>(|identity| &identity.name == SUN_PIECE_NAME)
                             .has::<TerminalRenderer>(),
                     ],
                     update_world_colors_from_time,
@@ -145,6 +149,7 @@ fn make_world_time(_: Vec<QueryResultList>, commands: GameCommandsArg) {
             color_transition_timers: HashMap::from([
                 (SKY_COLOR_TRANSITION_TIMER_NAME, Timer::new()),
                 (STAR_COLOR_TRANSITION_TIMER_NAME, Timer::new()),
+                (SUN_COLOR_TRANSITION_TIMER_NAME, Timer::new()),
             ]),
         })]))
 }
@@ -228,7 +233,9 @@ fn update_world_time(results: Vec<QueryResultList>, _: GameCommandsArg) {
 }
 
 fn update_world_colors_from_time(results: Vec<QueryResultList>, _: GameCommandsArg) {
-    if let [world_time_results, terminal_renderer_state_results, stars_results, ..] = &results[..] {
+    if let [world_time_results, terminal_renderer_state_results, stars_results, sun_pieces_results, ..] =
+        &results[..]
+    {
         let mut world_time = world_time_results.get_only_mut::<WorldTime>();
         let mut terminal_renderer_state =
             terminal_renderer_state_results.get_only_mut::<TerminalRendererState>();
@@ -270,6 +277,22 @@ fn update_world_colors_from_time(results: Vec<QueryResultList>, _: GameCommandsA
                 world_time
                     .color_transition_timers
                     .get_mut(STAR_COLOR_TRANSITION_TIMER_NAME)
+                    .unwrap(),
+            );
+        }
+
+        for sun_piece_result in sun_pieces_results {
+            let mut renderer = sun_piece_result.components().get_mut::<TerminalRenderer>();
+
+            let current_color_option = renderer.background_color;
+            let target_color_option = get_color(&SUN_COLORS, &world_time.time_of_day());
+
+            renderer.background_color = blend_color_to_target(
+                &current_color_option,
+                target_color_option,
+                world_time
+                    .color_transition_timers
+                    .get_mut(SUN_COLOR_TRANSITION_TIMER_NAME)
                     .unwrap(),
             );
         }
