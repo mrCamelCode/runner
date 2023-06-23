@@ -1,18 +1,24 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use rand::{thread_rng, Rng};
 use thomas::{
-    Dimensions2d, GameCommand, GameCommandsArg, Identity, IntCoords2d, Layer, Lerp, Matrix, Query,
-    QueryResultList, Rgb, System, SystemsGenerator, TerminalCollider, TerminalRenderer,
-    TerminalRendererState, TerminalTransform, Timer, EVENT_INIT, EVENT_UPDATE,
+    Dimensions2d, GameCommand, GameCommandsArg, Identity, IntCoords2d, IntVector2, Layer, Lerp,
+    Matrix, Priority, Query, QueryResultList, Rgb, System, SystemsGenerator, TerminalCollider,
+    TerminalRenderer, TerminalRendererState, TerminalTransform, Timer, EVENT_INIT, EVENT_UPDATE,
 };
 
 use crate::{
-    add_building,
-    components::{SkylineBuilding, WorldTime, NOON_TIME, SUNRISE_TIME, SUNSET_TIME},
-    get_color, GROUND_COLLISION_LAYER, PLAYER_X_OFFSET, PLAYER_Y_OFFSET, SCREEN_HEIGHT,
-    SCREEN_WIDTH, SKY_COLORS, STAR_COLORS, STAR_DISPLAY, STAR_LAYER, STAR_NAME, SUN_COLORS, SUN_ID,
-    SUN_LAYER, SUN_PIECE_NAME,
+    add_building, add_distance_marker,
+    components::{
+        Player, SkylineBuilding, TimeOfDay, WorldTime, NOON_TIME, SUNRISE_TIME, SUNSET_TIME,
+    },
+    get_color, BUILDING_PIECE_NAME, EVENT_GAME_OBJECT_SCROLL, EVENT_TIME_OF_DAY_CHANGE,
+    GROUND_COLLISION_LAYER, PLAYER_X_OFFSET, PLAYER_Y_OFFSET, SCREEN_HEIGHT, SCREEN_WIDTH,
+    SKY_COLORS, STAR_COLORS, STAR_DISPLAY, STAR_LAYER, STAR_NAME, SUN_COLORS, SUN_ID, SUN_LAYER,
+    SUN_PIECE_NAME, WINDOW_DISPLAY,
 };
 
 const GROUND_COLOR: Rgb = Rgb(94, 153, 84);
@@ -22,10 +28,15 @@ const COLOR_TRANSITION_TIME_MILLIS: u128 = 800;
 const SKY_COLOR_TRANSITION_TIMER_NAME: &str = "sky-color";
 const STAR_COLOR_TRANSITION_TIMER_NAME: &str = "star-color";
 const SUN_COLOR_TRANSITION_TIMER_NAME: &str = "sun-color";
+const WINDOW_COLOR_TRANSITION_TIMER_NAME: &str = "window-color";
+
+const WINDOW_TURN_OFF_TIME_MILLIS: u128 = 300;
 
 const AVAILABLE_BACKGROUND_HEIGHT: u64 = SCREEN_HEIGHT as u64 - PLAYER_Y_OFFSET as u64;
 
 const NUM_STARS: u8 = 26;
+const NUM_START_BUILDINGS: u8 = 15;
+
 
 pub struct WorldSystemsGenerator {}
 impl SystemsGenerator for WorldSystemsGenerator {
@@ -52,8 +63,37 @@ impl SystemsGenerator for WorldSystemsGenerator {
                         Query::new()
                             .has_where::<Identity>(|identity| &identity.name == SUN_PIECE_NAME)
                             .has::<TerminalRenderer>(),
+                        Query::new()
+                            .has_where::<Identity>(|identity| &identity.name == BUILDING_PIECE_NAME)
+                            .has::<TerminalRenderer>(),
                     ],
                     update_world_colors_from_time,
+                ),
+            ),
+            (
+                EVENT_TIME_OF_DAY_CHANGE,
+                System::new(
+                    vec![
+                        Query::new().has::<WorldTime>(),
+                        Query::new()
+                            .has_where::<Identity>(|identity| &identity.name == BUILDING_PIECE_NAME)
+                            .has_where::<TerminalRenderer>(|renderer| renderer.display == ' '),
+                    ],
+                    turn_on_windows,
+                ),
+            ),
+            (
+                EVENT_UPDATE,
+                System::new(
+                    vec![
+                        Query::new().has::<WorldTime>(),
+                        Query::new()
+                            .has_where::<Identity>(|identity| &identity.name == BUILDING_PIECE_NAME)
+                            .has_where::<TerminalRenderer>(|renderer| {
+                                renderer.display == WINDOW_DISPLAY
+                            }),
+                    ],
+                    turn_off_windows,
                 ),
             ),
             (
@@ -150,6 +190,7 @@ fn make_world_time(_: Vec<QueryResultList>, commands: GameCommandsArg) {
                 (SKY_COLOR_TRANSITION_TIMER_NAME, Timer::new()),
                 (STAR_COLOR_TRANSITION_TIMER_NAME, Timer::new()),
                 (SUN_COLOR_TRANSITION_TIMER_NAME, Timer::new()),
+                (WINDOW_COLOR_TRANSITION_TIMER_NAME, Timer::new()),
             ]),
         })]))
 }
@@ -204,7 +245,7 @@ fn make_skyline(_: Vec<QueryResultList>, commands: GameCommandsArg) {
 
     let mut x_coord = thread_rng().gen_range(1..5);
 
-    for _ in 0..10 {
+    for _ in 0..NUM_START_BUILDINGS {
         let size = Dimensions2d::new(
             thread_rng().gen_range(BUILDING_MIN_HEIGHT..=BUILDING_MAX_HEIGHT),
             thread_rng().gen_range(BUILDING_MIN_WIDTH..=BUILDING_MAX_WIDTH),
@@ -216,11 +257,13 @@ fn make_skyline(_: Vec<QueryResultList>, commands: GameCommandsArg) {
     }
 }
 
-fn update_world_time(results: Vec<QueryResultList>, _: GameCommandsArg) {
+fn update_world_time(results: Vec<QueryResultList>, commands: GameCommandsArg) {
     if let [world_time_results, ..] = &results[..] {
         let mut world_time = world_time_results.get_only_mut::<WorldTime>();
 
         if world_time.advance_time_timer.elapsed_millis() >= ADVANCE_TIME_WAIT_TIME_MILLIS {
+            let prev_time_of_day = world_time.time_of_day();
+
             if world_time.current_time == 23 {
                 world_time.current_time = 0;
             } else {
@@ -228,12 +271,106 @@ fn update_world_time(results: Vec<QueryResultList>, _: GameCommandsArg) {
             }
 
             world_time.advance_time_timer.restart();
+
+            if world_time.time_of_day() != prev_time_of_day {
+                commands
+                    .borrow_mut()
+                    .issue(GameCommand::TriggerEvent(EVENT_TIME_OF_DAY_CHANGE));
+            }
         }
     }
 }
 
+fn turn_on_windows(results: Vec<QueryResultList>, _: GameCommandsArg) {
+    if let [world_time_results, windows_results, ..] = &results[..] {
+        let world_time = world_time_results.get_only::<WorldTime>();
+
+        let num_windows_to_turn_on = match world_time.time_of_day() {
+            TimeOfDay::Dusk => windows_results.len() / 5,
+            TimeOfDay::Night => windows_results.len() / 2,
+            _ => 0,
+        };
+
+        let mut picked_window_indices: HashSet<usize> = HashSet::new();
+
+        for _ in 0..num_windows_to_turn_on {
+            if let Some(picked_window_index) =
+                pick_window_index(windows_results.len(), &picked_window_indices)
+            {
+                picked_window_indices.insert(picked_window_index);
+
+                windows_results[picked_window_index]
+                    .components()
+                    .get_mut::<TerminalRenderer>()
+                    .display = WINDOW_DISPLAY;
+            }
+        }
+    }
+}
+
+fn turn_off_windows(results: Vec<QueryResultList>, _: GameCommandsArg) {
+    if let [world_time_results, windows_results, ..] = &results[..] {
+        let mut world_time = world_time_results.get_only_mut::<WorldTime>();
+        let transition_timer = world_time
+            .color_transition_timers
+            .get_mut(WINDOW_COLOR_TRANSITION_TIMER_NAME)
+            .unwrap();
+
+        if !transition_timer.is_running() {
+            transition_timer.restart();
+        }
+
+        if transition_timer.elapsed_millis() >= WINDOW_TURN_OFF_TIME_MILLIS {
+            transition_timer.restart();
+
+            let mut num_windows_to_turn_off = windows_results.len() / 3;
+            if num_windows_to_turn_off == 0 && windows_results.len() > 0 {
+                num_windows_to_turn_off = windows_results.len();
+            }
+
+            let mut picked_window_indices: HashSet<usize> = HashSet::new();
+
+            if world_time.is_light() {
+                for _ in 0..num_windows_to_turn_off {
+                    if let Some(picked_window_index) =
+                        pick_window_index(windows_results.len(), &picked_window_indices)
+                    {
+                        picked_window_indices.insert(picked_window_index);
+
+                        windows_results[picked_window_index]
+                            .components()
+                            .get_mut::<TerminalRenderer>()
+                            .display = ' ';
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn pick_window_index(
+    window_collection_len: usize,
+    unavailable_indices: &HashSet<usize>,
+) -> Option<usize> {
+    if window_collection_len == unavailable_indices.len() {
+        return None;
+    }
+
+    let mut index = thread_rng().gen_range(0..window_collection_len);
+
+    while unavailable_indices.contains(&index) {
+        if index + 1 >= window_collection_len {
+            index = 0;
+        } else {
+            index += 1;
+        }
+    }
+
+    return Some(index);
+}
+
 fn update_world_colors_from_time(results: Vec<QueryResultList>, _: GameCommandsArg) {
-    if let [world_time_results, terminal_renderer_state_results, stars_results, sun_pieces_results, ..] =
+    if let [world_time_results, terminal_renderer_state_results, stars_results, sun_pieces_results, building_pieces_results, ..] =
         &results[..]
     {
         let mut world_time = world_time_results.get_only_mut::<WorldTime>();
@@ -351,7 +488,7 @@ fn update_sun_position(results: Vec<QueryResultList>, _: GameCommandsArg) {
             let mut sun_piece_transform =
                 sun_piece_result.components().get_mut::<TerminalTransform>();
 
-            sun_piece_transform.coords = sun_transform.coords + IntCoords2d::new(i as i64, 0);
+            sun_piece_transform.coords = sun_transform.coords + IntVector2::new(i as i64, 0);
         }
     }
 }
@@ -379,3 +516,4 @@ fn get_sun_y(current_time: u8) -> i64 {
         ) as i64
     }
 }
+

@@ -5,8 +5,8 @@ use thomas::{
 };
 
 use crate::{
-    components::Player, GROUND_COLLISION_LAYER, OBSTACLE_COLLISION_LAYER, PLAYER_COLLISION_LAYER,
-    PLAYER_DISPLAY, PLAYER_X_OFFSET, PLAYER_Y_OFFSET, SCREEN_HEIGHT,
+    components::Player, EVENT_GAME_OBJECT_SCROLL, GROUND_COLLISION_LAYER, OBSTACLE_COLLISION_LAYER,
+    PLAYER_COLLISION_LAYER, PLAYER_DISPLAY, PLAYER_X_OFFSET, PLAYER_Y_OFFSET, SCREEN_HEIGHT,
 };
 
 const JUMP_WAIT_TIME_MILLIS: u128 = 100;
@@ -72,24 +72,10 @@ impl SystemsGenerator for PlayerSystemsGenerator {
                     update_velocity,
                 ),
             ),
-            // (
-            //     EVENT_UPDATE,
-            //     System::new(
-            //         vec![Query::new().has::<Player>().has::<TerminalRenderer>()],
-            //         |results, _| {
-            //             if let [player_results, ..] = &results[..] {
-            //                 let player = player_results.get_only::<Player>();
-            //                 let mut renderer = player_results.get_only_mut::<TerminalRenderer>();
-
-            //                 renderer.foreground_color = if player.is_on_ground {
-            //                     Some(Rgb::green())
-            //                 } else {
-            //                     Some(Rgb::red())
-            //                 }
-            //             }
-            //         },
-            //     ),
-            // ),
+            (
+                EVENT_GAME_OBJECT_SCROLL,
+                System::new(vec![Query::new().has::<Player>()], update_distance_traveled),
+            ),
         ]
     }
 }
@@ -102,6 +88,7 @@ fn make_player(_: Vec<QueryResultList>, commands: GameCommandsArg) {
             velocity_timer: Timer::start_new(),
             vertical_velocity: 0,
             is_on_ground: false,
+            distance_traveled: 0,
         }),
         Box::new(TerminalTransform {
             coords: IntCoords2d::new(PLAYER_X_OFFSET, SCREEN_HEIGHT as i64 - PLAYER_Y_OFFSET),
@@ -179,3 +166,11 @@ fn detect_ground(results: Vec<QueryResultList>, _: GameCommandsArg) {
 }
 
 fn handle_obstacle_collision(results: Vec<QueryResultList>, commands: GameCommandsArg) {}
+
+fn update_distance_traveled(results: Vec<QueryResultList>, commands: GameCommandsArg) {
+    if let [player_results, ..] = &results[..] {
+        let mut player = player_results.get_only_mut::<Player>();
+
+        player.distance_traveled += 1;
+    }
+}

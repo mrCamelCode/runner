@@ -13,7 +13,6 @@ pub enum TimeOfDay {
     Morning,
     Noon,
     Afternoon,
-    Evening,
     Dusk,
 }
 
@@ -36,6 +35,15 @@ impl WorldTime {
             13..=16 => TimeOfDay::Afternoon,
             17..=HOUR_BEFORE_SUNSET => TimeOfDay::Dusk,
             _ => TimeOfDay::Night,
+        }
+    }
+
+    pub fn is_light(&self) -> bool {
+        match self.time_of_day() {
+            TimeOfDay::Morning | TimeOfDay::Noon | TimeOfDay::Afternoon => {
+                true
+            }
+            _ => false,
         }
     }
 }
