@@ -5,7 +5,8 @@ use thomas::{
 };
 
 use crate::{
-    components::Player, EVENT_GAME_OBJECT_SCROLL, GROUND_COLLISION_LAYER, OBSTACLE_COLLISION_LAYER,
+    components::{FixedToCamera, Player},
+    EVENT_GAME_OBJECT_SCROLL, GROUND_COLLISION_LAYER, OBSTACLE_COLLISION_LAYER,
     PLAYER_COLLISION_LAYER, PLAYER_DISPLAY, PLAYER_X_OFFSET, PLAYER_Y_OFFSET, SCREEN_HEIGHT,
 };
 
@@ -44,7 +45,7 @@ impl SystemsGenerator for PlayerSystemsGenerator {
             (
                 EVENT_UPDATE,
                 System::new(
-                    vec![Query::new().has::<Player>().has::<TerminalTransform>()],
+                    vec![Query::new().has::<Player>().has::<FixedToCamera>()],
                     apply_velocity,
                 ),
             ),
@@ -81,6 +82,8 @@ impl SystemsGenerator for PlayerSystemsGenerator {
 }
 
 fn make_player(_: Vec<QueryResultList>, commands: GameCommandsArg) {
+    let coords = IntCoords2d::new(PLAYER_X_OFFSET, SCREEN_HEIGHT as i64 - PLAYER_Y_OFFSET);
+
     commands.borrow_mut().issue(GameCommand::AddEntity(vec![
         Box::new(Player {
             jump_timer: Timer::start_new(),
@@ -90,8 +93,10 @@ fn make_player(_: Vec<QueryResultList>, commands: GameCommandsArg) {
             is_on_ground: false,
             distance_traveled: 0,
         }),
-        Box::new(TerminalTransform {
-            coords: IntCoords2d::new(PLAYER_X_OFFSET, SCREEN_HEIGHT as i64 - PLAYER_Y_OFFSET),
+        Box::new(TerminalTransform { coords }),
+        Box::new(FixedToCamera {
+            base_position: coords,
+            offset: IntCoords2d::zero(),
         }),
         Box::new(TerminalRenderer {
             display: PLAYER_DISPLAY,
@@ -124,13 +129,13 @@ fn handle_input(results: Vec<QueryResultList>, _: GameCommandsArg) {
 fn apply_velocity(results: Vec<QueryResultList>, _: GameCommandsArg) {
     if let [player_results, ..] = &results[..] {
         let mut player = player_results.get_only_mut::<Player>();
-        let mut transform = player_results.get_only_mut::<TerminalTransform>();
+        let mut fixed_to_camera = player_results.get_only_mut::<FixedToCamera>();
 
         if player.vertical_velocity != 0
             && player.velocity_timer.elapsed_millis()
                 >= 1000 / i64::abs(player.vertical_velocity) as u128
         {
-            transform.coords += if player.vertical_velocity > 0 {
+            fixed_to_camera.offset += if player.vertical_velocity > 0 {
                 IntCoords2d::up()
             } else {
                 IntCoords2d::down()

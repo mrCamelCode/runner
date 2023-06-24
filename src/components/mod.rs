@@ -9,3 +9,9 @@ pub use comp_world_time::*;
 
 mod comp_game_object_manager;
 pub use comp_game_object_manager::*;
+
+mod comp_game_manager;
+pub use comp_game_manager::*;
+
+mod comp_fixed_to_camera;
+pub use comp_fixed_to_camera::*;

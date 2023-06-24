@@ -1,13 +1,14 @@
 use rand::{thread_rng, Rng};
 use thomas::{
-    Alignment, Component, Dimensions2d, GameCommand, GameCommandsArg, Identity, IntCoords2d, Layer,
-    Matrix, Rgb, TerminalCollider, TerminalRenderer, TerminalTransform, WorldText,
+    Alignment, Component, Dimensions2d, GameCommand, GameCommandsArg, Identity, IntCoords2d,
+    IntVector2, Layer, Matrix, Rgb, TerminalCollider, TerminalRenderer, TerminalTransform, Vector2,
+    WorldText,
 };
 
 use crate::{
-    ALTERNATE_BUILDING_COLOR, BUILDING_COLOR, BUILDING_PIECE_NAME, DISTANCE_MARKER_PIECE_NAME,
-    OBSTACLE_BACKGROUND_COLOR, OBSTACLE_COLLISION_LAYER, OBSTACLE_NAME, PLAYER_Y_OFFSET,
-    SCREEN_HEIGHT, SCREEN_WIDTH, SKYLINE_LAYER, WINDOW_COLOR,
+    components::FixedToCamera, ALTERNATE_BUILDING_COLOR, BUILDING_COLOR, BUILDING_PIECE_NAME,
+    DISTANCE_MARKER_PIECE_NAME, OBSTACLE_BACKGROUND_COLOR, OBSTACLE_COLLISION_LAYER, OBSTACLE_NAME,
+    PLAYER_Y_OFFSET, SCREEN_HEIGHT, SCREEN_WIDTH, SKYLINE_LAYER, WINDOW_COLOR,
 };
 
 pub fn add_building(commands: GameCommandsArg, x_coord: i64, size: Dimensions2d) {
@@ -34,7 +35,11 @@ pub fn add_building(commands: GameCommandsArg, x_coord: i64, size: Dimensions2d)
                 foreground_color: Some(WINDOW_COLOR),
                 background_color: Some(background_color),
             }),
-            Box::new(TerminalTransform { coords }),
+            Box::new(TerminalTransform { coords: coords }),
+            Box::new(FixedToCamera {
+                base_position: coords,
+                offset: IntCoords2d::zero(),
+            }),
             Box::new(Identity {
                 id: String::from(""),
                 name: String::from(BUILDING_PIECE_NAME),
