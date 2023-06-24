@@ -66,6 +66,11 @@ pub const BUILDING_COLOR: Rgb = Rgb(143, 143, 143);
 pub const ALTERNATE_BUILDING_COLOR: Rgb = Rgb(135, 135, 135);
 pub const WINDOW_COLOR: Rgb = Rgb(245, 195, 32);
 
+pub const SKY_COLOR_TRANSITION_TIMER_NAME: &str = "sky-color";
+pub const STAR_COLOR_TRANSITION_TIMER_NAME: &str = "star-color";
+pub const SUN_COLOR_TRANSITION_TIMER_NAME: &str = "sun-color";
+pub const WINDOW_COLOR_TRANSITION_TIMER_NAME: &str = "window-color";
+
 pub fn get_color<'a>(colors: &'a TimeOfDayColors, time_of_day: &TimeOfDay) -> &'a Option<Rgb> {
     &colors
         .iter()

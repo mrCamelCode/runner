@@ -13,40 +13,26 @@ use thomas::{
 use crate::{
     add_building, add_distance_marker,
     components::{
-        Player, SkylineBuilding, TimeOfDay, WorldTime, NOON_TIME, SUNRISE_TIME, SUNSET_TIME,
+        FixedToCamera, Player, SkylineBuilding, TimeOfDay, WorldTime, NOON_TIME, SUNRISE_TIME,
+        SUNSET_TIME,
     },
     get_color, BUILDING_PIECE_NAME, EVENT_GAME_OBJECT_SCROLL, EVENT_TIME_OF_DAY_CHANGE,
     GROUND_COLLISION_LAYER, PLAYER_X_OFFSET, PLAYER_Y_OFFSET, SCREEN_HEIGHT, SCREEN_WIDTH,
-    SKY_COLORS, STAR_COLORS, STAR_DISPLAY, STAR_LAYER, STAR_NAME, SUN_COLORS, SUN_ID, SUN_LAYER,
-    SUN_PIECE_NAME, WINDOW_DISPLAY,
+    SKY_COLORS, SKY_COLOR_TRANSITION_TIMER_NAME, STAR_COLORS, STAR_COLOR_TRANSITION_TIMER_NAME,
+    STAR_DISPLAY, STAR_LAYER, STAR_NAME, SUN_COLORS, SUN_COLOR_TRANSITION_TIMER_NAME, SUN_ID,
+    SUN_LAYER, SUN_PIECE_NAME, WINDOW_COLOR_TRANSITION_TIMER_NAME, WINDOW_DISPLAY,
 };
 
-const GROUND_COLOR: Rgb = Rgb(94, 153, 84);
 const ADVANCE_TIME_WAIT_TIME_MILLIS: u128 = 1000;
 
 const COLOR_TRANSITION_TIME_MILLIS: u128 = 800;
-const SKY_COLOR_TRANSITION_TIMER_NAME: &str = "sky-color";
-const STAR_COLOR_TRANSITION_TIMER_NAME: &str = "star-color";
-const SUN_COLOR_TRANSITION_TIMER_NAME: &str = "sun-color";
-const WINDOW_COLOR_TRANSITION_TIMER_NAME: &str = "window-color";
 
 const WINDOW_TURN_OFF_TIME_MILLIS: u128 = 300;
 
-const AVAILABLE_BACKGROUND_HEIGHT: u64 = SCREEN_HEIGHT as u64 - PLAYER_Y_OFFSET as u64;
-
-const NUM_STARS: u8 = 26;
-const NUM_START_BUILDINGS: u8 = 15;
-
-
-pub struct WorldSystemsGenerator {}
-impl SystemsGenerator for WorldSystemsGenerator {
+pub struct WorldUpdateSystemsGenerator {}
+impl SystemsGenerator for WorldUpdateSystemsGenerator {
     fn generate(&self) -> Vec<(&'static str, System)> {
         vec![
-            (EVENT_INIT, System::new(vec![], make_world_time)),
-            (EVENT_INIT, System::new(vec![], make_ground)),
-            (EVENT_INIT, System::new(vec![], make_skyline)),
-            (EVENT_INIT, System::new(vec![], make_stars)),
-            (EVENT_INIT, System::new(vec![], make_sun)),
             (
                 EVENT_UPDATE,
                 System::new(vec![Query::new().has::<WorldTime>()], update_world_time),
@@ -103,159 +89,20 @@ impl SystemsGenerator for WorldSystemsGenerator {
                         Query::new().has::<WorldTime>(),
                         Query::new()
                             .has_where::<Identity>(|identity| &identity.id == SUN_ID)
-                            .has::<TerminalTransform>(),
+                            .has::<FixedToCamera>(),
                         Query::new()
                             .has_where::<Identity>(|identity| &identity.name == SUN_PIECE_NAME)
-                            .has::<TerminalTransform>(),
+                            .has::<FixedToCamera>(),
                     ],
                     update_sun_position,
                 ),
             ),
+            (EVENT_UPDATE, System::new(vec![], update_building_positions)),
         ]
     }
 }
 
-fn make_sun(_: Vec<QueryResultList>, commands: GameCommandsArg) {
-    commands.borrow_mut().issue(GameCommand::AddEntity(vec![
-        Box::new(TerminalTransform {
-            coords: IntCoords2d::zero(),
-        }),
-        Box::new(Identity {
-            name: String::from(""),
-            id: String::from(SUN_ID),
-        }),
-    ]));
-    commands.borrow_mut().issue(GameCommand::AddEntity(vec![
-        Box::new(TerminalRenderer {
-            display: ' ',
-            background_color: Some(Rgb::yellow()),
-            foreground_color: None,
-            layer: SUN_LAYER,
-        }),
-        Box::new(TerminalTransform {
-            coords: IntCoords2d::zero(),
-        }),
-        Box::new(Identity {
-            name: String::from(SUN_PIECE_NAME),
-            id: String::from(""),
-        }),
-    ]));
-    commands.borrow_mut().issue(GameCommand::AddEntity(vec![
-        Box::new(TerminalRenderer {
-            display: ' ',
-            background_color: Some(Rgb::yellow()),
-            foreground_color: None,
-            layer: SUN_LAYER,
-        }),
-        Box::new(TerminalTransform {
-            coords: IntCoords2d::zero(),
-        }),
-        Box::new(Identity {
-            name: String::from(SUN_PIECE_NAME),
-            id: String::from(""),
-        }),
-    ]));
-}
-
-fn make_stars(_: Vec<QueryResultList>, commands: GameCommandsArg) {
-    for _ in 0..NUM_STARS {
-        commands.borrow_mut().issue(GameCommand::AddEntity(vec![
-            Box::new(TerminalRenderer {
-                display: STAR_DISPLAY,
-                layer: STAR_LAYER,
-                foreground_color: None,
-                background_color: None,
-            }),
-            Box::new(TerminalTransform {
-                coords: IntCoords2d::new(
-                    thread_rng().gen_range(0..SCREEN_WIDTH as i64),
-                    thread_rng().gen_range(0..AVAILABLE_BACKGROUND_HEIGHT as i64),
-                ),
-            }),
-            Box::new(Identity {
-                id: String::from(""),
-                name: String::from(STAR_NAME),
-            }),
-        ]))
-    }
-}
-
-fn make_world_time(_: Vec<QueryResultList>, commands: GameCommandsArg) {
-    commands
-        .borrow_mut()
-        .issue(GameCommand::AddEntity(vec![Box::new(WorldTime {
-            current_time: 9,
-            advance_time_timer: Timer::start_new(),
-            color_transition_timers: HashMap::from([
-                (SKY_COLOR_TRANSITION_TIMER_NAME, Timer::new()),
-                (STAR_COLOR_TRANSITION_TIMER_NAME, Timer::new()),
-                (SUN_COLOR_TRANSITION_TIMER_NAME, Timer::new()),
-                (WINDOW_COLOR_TRANSITION_TIMER_NAME, Timer::new()),
-            ]),
-        })]))
-}
-
-fn make_ground(_: Vec<QueryResultList>, commands: GameCommandsArg) {
-    make_real_ground(Rc::clone(&commands));
-    make_decorative_ground(Rc::clone(&commands));
-}
-
-fn make_real_ground(commands: GameCommandsArg) {
-    commands.borrow_mut().issue(GameCommand::AddEntity(vec![
-        Box::new(TerminalTransform {
-            coords: IntCoords2d::new(PLAYER_X_OFFSET, SCREEN_HEIGHT as i64 - PLAYER_Y_OFFSET),
-        }),
-        Box::new(TerminalCollider {
-            is_active: true,
-            layer: GROUND_COLLISION_LAYER,
-        }),
-    ]));
-}
-
-fn make_decorative_ground(commands: GameCommandsArg) {
-    let ground_fill_matrix = Matrix::new(
-        Dimensions2d::new(PLAYER_Y_OFFSET as u64, SCREEN_WIDTH as u64),
-        || (),
-    );
-    let ground_start_coords = IntCoords2d::new(0, SCREEN_HEIGHT as i64 - PLAYER_Y_OFFSET + 1);
-
-    for cell in &ground_fill_matrix {
-        commands.borrow_mut().issue(GameCommand::AddEntity(vec![
-            Box::new(TerminalRenderer {
-                display: ' ',
-                layer: Layer::base(),
-                background_color: Some(GROUND_COLOR),
-                foreground_color: None,
-            }),
-            Box::new(TerminalTransform {
-                coords: ground_start_coords + *cell.location(),
-            }),
-            Box::new(SkylineBuilding {}),
-        ]));
-    }
-}
-
-fn make_skyline(_: Vec<QueryResultList>, commands: GameCommandsArg) {
-    const BUILDING_MIN_WIDTH: u64 = 3;
-    const BUILDING_MAX_WIDTH: u64 = 6;
-
-    const BUILDING_MIN_HEIGHT: u64 =
-        AVAILABLE_BACKGROUND_HEIGHT - (AVAILABLE_BACKGROUND_HEIGHT as f64 * 0.8) as u64;
-    const BUILDING_MAX_HEIGHT: u64 = AVAILABLE_BACKGROUND_HEIGHT - 1;
-
-    let mut x_coord = thread_rng().gen_range(1..5);
-
-    for _ in 0..NUM_START_BUILDINGS {
-        let size = Dimensions2d::new(
-            thread_rng().gen_range(BUILDING_MIN_HEIGHT..=BUILDING_MAX_HEIGHT),
-            thread_rng().gen_range(BUILDING_MIN_WIDTH..=BUILDING_MAX_WIDTH),
-        );
-
-        add_building(Rc::clone(&commands), x_coord, size.clone());
-
-        x_coord += size.width() as i64;
-    }
-}
+fn update_building_positions(results: Vec<QueryResultList>, commands: GameCommandsArg) {}
 
 fn update_world_time(results: Vec<QueryResultList>, commands: GameCommandsArg) {
     if let [world_time_results, ..] = &results[..] {
@@ -475,9 +322,9 @@ fn blend_color_to_target(
 fn update_sun_position(results: Vec<QueryResultList>, _: GameCommandsArg) {
     if let [world_time_results, sun_results, sun_pieces_results, ..] = &results[..] {
         let world_time = world_time_results.get_only::<WorldTime>();
-        let mut sun_transform = sun_results.get_only_mut::<TerminalTransform>();
+        let mut sun_fixed_to_camera = sun_results.get_only_mut::<FixedToCamera>();
 
-        sun_transform.coords = IntCoords2d::new(
+        sun_fixed_to_camera.offset = IntCoords2d::new(
             get_sun_x(world_time.current_time),
             get_sun_y(world_time.current_time),
         );
@@ -485,10 +332,11 @@ fn update_sun_position(results: Vec<QueryResultList>, _: GameCommandsArg) {
         for i in 0..sun_pieces_results.len() {
             let sun_piece_result = &sun_pieces_results[i];
 
-            let mut sun_piece_transform =
-                sun_piece_result.components().get_mut::<TerminalTransform>();
+            let mut sun_piece_fixed_to_camera =
+                sun_piece_result.components().get_mut::<FixedToCamera>();
 
-            sun_piece_transform.coords = sun_transform.coords + IntVector2::new(i as i64, 0);
+            sun_piece_fixed_to_camera.offset =
+                sun_fixed_to_camera.offset + IntVector2::new(i as i64, 0);
         }
     }
 }
@@ -516,4 +364,3 @@ fn get_sun_y(current_time: u8) -> i64 {
         ) as i64
     }
 }
-

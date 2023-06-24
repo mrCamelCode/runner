@@ -20,8 +20,11 @@ pub fn run() {
         press_escape_to_quit: true,
     })
     .add_systems_from_generator(PlayerSystemsGenerator {})
-    .add_systems_from_generator(WorldSystemsGenerator {})
-    .add_systems_from_generator(GameObjectsSystemsGenerator {})
+    .add_systems_from_generator(WorldSetupSystemsGenerator {})
+    .add_systems_from_generator(WorldUpdateSystemsGenerator {})
+    .add_systems_from_generator(GameManagerSystemsGenerator {})
+    .add_systems_from_generator(FixedToCameraSystemsGenerator {})
+    // .add_systems_from_generator(GameObjectsSystemsGenerator {})
     .add_systems_from_generator(HudSystemsGenerator {})
     .start(Renderer::Terminal(TerminalRendererOptions {
         screen_resolution: Dimensions2d::new(SCREEN_HEIGHT as u64, SCREEN_WIDTH as u64),
