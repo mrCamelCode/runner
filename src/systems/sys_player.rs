@@ -1,13 +1,13 @@
 use thomas::{
     GameCommand, GameCommandsArg, Input, IntCoords2d, Keycode, Layer, Priority, Query,
-    QueryResultList, Rgb, System, SystemsGenerator, TerminalCollider, TerminalCollision,
-    TerminalRenderer, TerminalTransform, Timer, EVENT_INIT, EVENT_UPDATE,
+    QueryResultList, Rgb, System, SystemsGenerator, TerminalCamera, TerminalCollider,
+    TerminalCollision, TerminalRenderer, TerminalTransform, Timer, EVENT_INIT, EVENT_UPDATE,
 };
 
 use crate::{
     components::{FixedToCamera, Player},
-    EVENT_GAME_OBJECT_SCROLL, GROUND_COLLISION_LAYER, OBSTACLE_COLLISION_LAYER,
-    PLAYER_COLLISION_LAYER, PLAYER_DISPLAY, PLAYER_X_OFFSET, PLAYER_Y_OFFSET, SCREEN_HEIGHT,
+    GROUND_COLLISION_LAYER, OBSTACLE_COLLISION_LAYER, PLAYER_COLLISION_LAYER, PLAYER_DISPLAY,
+    PLAYER_X_OFFSET, PLAYER_Y_OFFSET, SCREEN_HEIGHT,
 };
 
 const JUMP_WAIT_TIME_MILLIS: u128 = 100;
@@ -74,8 +74,16 @@ impl SystemsGenerator for PlayerSystemsGenerator {
                 ),
             ),
             (
-                EVENT_GAME_OBJECT_SCROLL,
-                System::new(vec![Query::new().has::<Player>()], update_distance_traveled),
+                EVENT_UPDATE,
+                System::new(
+                    vec![
+                        Query::new().has::<Player>(),
+                        Query::new()
+                            .has_where::<TerminalCamera>(|cam| cam.is_main)
+                            .has::<TerminalTransform>(),
+                    ],
+                    update_distance_traveled,
+                ),
             ),
         ]
     }
@@ -173,9 +181,10 @@ fn detect_ground(results: Vec<QueryResultList>, _: GameCommandsArg) {
 fn handle_obstacle_collision(results: Vec<QueryResultList>, commands: GameCommandsArg) {}
 
 fn update_distance_traveled(results: Vec<QueryResultList>, commands: GameCommandsArg) {
-    if let [player_results, ..] = &results[..] {
+    if let [player_results, main_cam_results, ..] = &results[..] {
         let mut player = player_results.get_only_mut::<Player>();
+        let main_cam_transform = main_cam_results.get_only::<TerminalTransform>();
 
-        player.distance_traveled += 1;
+        player.distance_traveled = main_cam_transform.coords.x() + PLAYER_X_OFFSET;
     }
 }

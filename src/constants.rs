@@ -5,7 +5,6 @@ use crate::components::TimeOfDay;
 pub type TimeOfDayColors = [(TimeOfDay, Option<Rgb>); 6];
 
 pub const EVENT_TIME_OF_DAY_CHANGE: &str = "event-time-change";
-pub const EVENT_GAME_OBJECT_SCROLL: &str = "obstacle-scroll";
 
 pub const SKYLINE_LAYER: Layer = Layer(-2);
 pub const STAR_LAYER: Layer = Layer(-4);
@@ -24,6 +23,8 @@ pub const GROUND_COLLISION_LAYER: Layer = Layer(2);
 pub const OBSTACLE_NAME: &str = "obstacle";
 pub const OBSTACLE_BACKGROUND_COLOR: Rgb = Rgb(255, 0, 0);
 pub const OBSTACLE_COLLISION_LAYER: Layer = Layer(3);
+
+pub const DISTANCE_MARKER_COLLISION_LAYER: Layer = Layer(4);
 
 pub const STAR_NAME: &str = "star";
 pub const STAR_DISPLAY: char = '•';

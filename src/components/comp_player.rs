@@ -7,5 +7,5 @@ pub struct Player {
     pub velocity_timer: Timer,
     pub vertical_velocity: i64,
     pub is_on_ground: bool,
-    pub distance_traveled: u64,
+    pub distance_traveled: i64,
 }

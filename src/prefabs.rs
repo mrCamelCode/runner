@@ -6,9 +6,10 @@ use thomas::{
 };
 
 use crate::{
-    components::FixedToCamera, ALTERNATE_BUILDING_COLOR, BUILDING_COLOR, BUILDING_PIECE_NAME,
-    DISTANCE_MARKER_PIECE_NAME, OBSTACLE_BACKGROUND_COLOR, OBSTACLE_COLLISION_LAYER, OBSTACLE_NAME,
-    PLAYER_Y_OFFSET, SCREEN_HEIGHT, SCREEN_WIDTH, SKYLINE_LAYER, WINDOW_COLOR,
+    components::{CleanupOnScreenExit, FixedToCamera},
+    ALTERNATE_BUILDING_COLOR, BUILDING_COLOR, BUILDING_PIECE_NAME, DISTANCE_MARKER_PIECE_NAME,
+    OBSTACLE_BACKGROUND_COLOR, OBSTACLE_COLLISION_LAYER, OBSTACLE_NAME, PLAYER_Y_OFFSET,
+    SCREEN_HEIGHT, SCREEN_WIDTH, SKYLINE_LAYER, WINDOW_COLOR,
 };
 
 pub fn add_building(commands: GameCommandsArg, x_coord: i64, size: Dimensions2d) {
@@ -70,13 +71,14 @@ pub fn make_obstacle() -> Vec<Box<dyn Component>> {
             id: String::from(""),
             name: String::from(OBSTACLE_NAME),
         }),
+        Box::new(CleanupOnScreenExit {}),
     ]
 }
 
 pub fn add_distance_marker(commands: GameCommandsArg, distance: u64) {
     let board_matrix = Matrix::new(Dimensions2d::new(1, 5), || ());
 
-    let base_x_pos = SCREEN_WIDTH;
+    let base_x_pos = distance;
 
     let board_y_pos: i64 = SCREEN_HEIGHT as i64 - PLAYER_Y_OFFSET as i64 - 1;
 
@@ -95,6 +97,7 @@ pub fn add_distance_marker(commands: GameCommandsArg, distance: u64) {
                 id: String::from(""),
                 name: String::from(DISTANCE_MARKER_PIECE_NAME),
             }),
+            Box::new(CleanupOnScreenExit {}),
         ]));
     }
 
@@ -121,12 +124,12 @@ pub fn add_distance_marker(commands: GameCommandsArg, distance: u64) {
                 id: String::from(""),
                 name: String::from(DISTANCE_MARKER_PIECE_NAME),
             }),
+            Box::new(CleanupOnScreenExit {}),
         ]))
     }
 
     commands.borrow_mut().issue(GameCommand::AddEntity(vec![
         Box::new(WorldText {
-            coords: IntCoords2d::new(base_x_pos as i64, board_y_pos),
             offset: IntCoords2d::zero(),
             background_color: None,
             foreground_color: Some(Rgb(21, 77, 36)),
@@ -137,5 +140,9 @@ pub fn add_distance_marker(commands: GameCommandsArg, distance: u64) {
             id: String::from(""),
             name: String::from(DISTANCE_MARKER_PIECE_NAME),
         }),
+        Box::new(TerminalTransform {
+            coords: IntCoords2d::new(base_x_pos as i64, board_y_pos),
+        }),
+        Box::new(CleanupOnScreenExit {}),
     ]))
 }

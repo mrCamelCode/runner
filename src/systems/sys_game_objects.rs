@@ -2,26 +2,25 @@ use std::rc::Rc;
 
 use thomas::{
     GameCommand, GameCommandsArg, Identity, IntVector2, Priority, Query, QueryResultList, System,
-    SystemsGenerator, TerminalTransform, Timer, WorldText, EVENT_INIT, EVENT_UPDATE,
+    SystemsGenerator, TerminalCamera, TerminalTransform, Timer, WorldText, EVENT_INIT,
+    EVENT_UPDATE,
 };
 
 use crate::{
     add_distance_marker,
-    components::{GameObjectManager, Player},
-    make_obstacle, DISTANCE_MARKER_PIECE_NAME, EVENT_GAME_OBJECT_SCROLL, OBSTACLE_NAME,
-    SCREEN_WIDTH,
+    components::{CleanupOnScreenExit, GameObjectManager, Player},
+    make_obstacle, DISTANCE_MARKER_PIECE_NAME, OBSTACLE_NAME, SCREEN_WIDTH,
 };
 
 const GENERATE_OBSTACLE_WAIT_TIME_MILLIS: u128 = 3000;
-const OBSTACLE_SCROLL_WAIT_TIME_MILLIS: u128 = 50;
 
-const DISTANCE_MARKER_SPACING: u32 = 100;
+const DISTANCE_MARKER_SPACING: u64 = 500;
 
 pub struct GameObjectsSystemsGenerator {}
 impl SystemsGenerator for GameObjectsSystemsGenerator {
     fn generate(&self) -> Vec<(&'static str, System)> {
         vec![
-            (EVENT_INIT, System::new(vec![], setup_obstacle_manager)),
+            (EVENT_INIT, System::new(vec![], make_obstacle_manager)),
             (
                 EVENT_UPDATE,
                 System::new(
@@ -34,33 +33,23 @@ impl SystemsGenerator for GameObjectsSystemsGenerator {
                 System::new(
                     vec![
                         Query::new()
-                            .has_where::<Identity>(|id| &id.name == OBSTACLE_NAME)
+                            .has::<CleanupOnScreenExit>()
                             .has::<TerminalTransform>(),
                         Query::new()
-                            .has_where::<Identity>(|id| &id.name == DISTANCE_MARKER_PIECE_NAME)
+                            .has_where::<TerminalCamera>(|cam| cam.is_main)
                             .has::<TerminalTransform>(),
-                        Query::new()
-                            .has_where::<Identity>(|id| &id.name == DISTANCE_MARKER_PIECE_NAME)
-                            .has::<WorldText>(),
-                        Query::new().has::<GameObjectManager>(),
                     ],
-                    scroll_game_objects,
+                    cleanup_entities,
                 ),
             ),
             (
                 EVENT_UPDATE,
                 System::new(
-                    vec![Query::new()
-                        .has_where::<Identity>(|id| &id.name == OBSTACLE_NAME)
-                        .has_where::<TerminalTransform>(|transform| transform.coords.x() < 0)],
-                    cleanup_obstacles,
-                ),
-            ),
-            (
-                EVENT_GAME_OBJECT_SCROLL,
-                System::new_with_priority(
-                    Priority::lower_than(&Priority::default()),
-                    vec![Query::new().has::<Player>()],
+                    vec![
+                        Query::new()
+                            .has_where::<Identity>(|id| &id.name == DISTANCE_MARKER_PIECE_NAME),
+                        Query::new().has::<Player>(),
+                    ],
                     generate_distance_markers,
                 ),
             ),
@@ -68,7 +57,7 @@ impl SystemsGenerator for GameObjectsSystemsGenerator {
     }
 }
 
-fn setup_obstacle_manager(_: Vec<QueryResultList>, commands: GameCommandsArg) {
+fn make_obstacle_manager(_: Vec<QueryResultList>, commands: GameCommandsArg) {
     commands
         .borrow_mut()
         .issue(GameCommand::AddEntity(vec![Box::new(GameObjectManager {
@@ -93,61 +82,32 @@ fn generate_obstacles(results: Vec<QueryResultList>, commands: GameCommandsArg) 
     }
 }
 
-fn cleanup_obstacles(results: Vec<QueryResultList>, commands: GameCommandsArg) {
-    if let [obstacles_to_cleanup_results, ..] = &results[..] {
-        for obstacle_result in obstacles_to_cleanup_results {
-            commands
-                .borrow_mut()
-                .issue(GameCommand::DestroyEntity(*obstacle_result.entity()));
-        }
-    }
-}
+fn cleanup_entities(results: Vec<QueryResultList>, commands: GameCommandsArg) {
+    if let [transform_results, main_cam_results, ..] = &results[..] {
+        let main_cam_transform = main_cam_results.get_only::<TerminalTransform>();
 
-fn scroll_game_objects(results: Vec<QueryResultList>, commands: GameCommandsArg) {
-    if let [obstacles_results, distance_marker_piece_results, distance_marker_text_results, obstacle_manager_results, ..] =
-        &results[..]
-    {
-        let mut obstacle_manager = obstacle_manager_results.get_only_mut::<GameObjectManager>();
+        for transform_result in transform_results {
+            let transform = transform_result.components().get::<TerminalTransform>();
 
-        if obstacle_manager.scroll_timer.elapsed_millis() >= OBSTACLE_SCROLL_WAIT_TIME_MILLIS {
-            for obstacle_result in obstacles_results {
-                let mut transform = obstacle_result.components().get_mut::<TerminalTransform>();
-
-                transform.coords += IntVector2::left();
+            if transform.coords.x() < main_cam_transform.coords.x() - 10 {
+                commands
+                    .borrow_mut()
+                    .issue(GameCommand::DestroyEntity(*transform_result.entity()));
             }
-
-            for distance_marker_result in distance_marker_piece_results {
-                let mut transform = distance_marker_result
-                    .components()
-                    .get_mut::<TerminalTransform>();
-
-                transform.coords += IntVector2::left();
-            }
-
-            for distance_marker_text_result in distance_marker_text_results {
-                let mut world_text = distance_marker_text_result.components().get_mut::<WorldText>();
-
-                world_text.coords += IntVector2::left();
-            }
-
-            obstacle_manager.scroll_timer.restart();
-
-            commands
-                .borrow_mut()
-                .issue(GameCommand::TriggerEvent(EVENT_GAME_OBJECT_SCROLL));
         }
     }
 }
 
 fn generate_distance_markers(results: Vec<QueryResultList>, commands: GameCommandsArg) {
-    if let [player_results, ..] = &results[..] {
-        let player = player_results.get_only::<Player>();
+    if let [existing_distance_marker_pieces_results, player_results, ..] = &results[..] {
+        if existing_distance_marker_pieces_results.len() == 0 {
+            let player = player_results.get_only::<Player>();
 
-        if (player.distance_traveled + SCREEN_WIDTH as u64) % DISTANCE_MARKER_SPACING as u64 == 0 {
-            add_distance_marker(
-                Rc::clone(&commands),
-                player.distance_traveled + SCREEN_WIDTH as u64,
-            );
+            let next_distance_marker_distance = DISTANCE_MARKER_SPACING
+                * ((f64::floor(player.distance_traveled as f64 / DISTANCE_MARKER_SPACING as f64)
+                    + 1.0) as u64);
+
+            add_distance_marker(Rc::clone(&commands), next_distance_marker_distance as u64);
         }
     }
 }

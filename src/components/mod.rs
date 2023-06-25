@@ -15,3 +15,6 @@ pub use comp_game_manager::*;
 
 mod comp_fixed_to_camera;
 pub use comp_fixed_to_camera::*;
+
+mod comp_cleanup_on_screen_exit;
+pub use comp_cleanup_on_screen_exit::*;
