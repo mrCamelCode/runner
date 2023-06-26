@@ -1,3 +1,0 @@
-- Make it show You Win! when you hit 10,000 points.
-- Show "Press any key to start" at the start of the game so the player
-has control over when the game begins.
