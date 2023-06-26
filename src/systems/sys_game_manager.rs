@@ -93,7 +93,7 @@ impl SystemsGenerator for GameManagerSystemsGenerator {
                 EVENT_UPDATE,
                 System::new(
                     vec![
-                        Query::new().has::<GameManager>(),
+                        Query::new().has_where::<GameManager>(|gm| !gm.is_game_over()),
                         Query::new().has_where::<Player>(|player| player.lives == 0),
                     ],
                     trigger_defeat,
@@ -181,7 +181,7 @@ fn handle_press_key_to_restart(results: Vec<QueryResultList>, commands: GameComm
     if let [input_results, victory_or_defeat_game_manager_results, ..] = &results[..] {
         let input = input_results.get_only::<Input>();
 
-        if !victory_or_defeat_game_manager_results.is_empty() && input.is_any_key_down() {
+        if !victory_or_defeat_game_manager_results.is_empty() && input.is_key_down(&Keycode::R) {
             let mut game_manager =
                 victory_or_defeat_game_manager_results.get_only_mut::<GameManager>();
 
@@ -231,9 +231,9 @@ fn trigger_victory(results: Vec<QueryResultList>, commands: GameCommandsArg) {
 }
 
 fn trigger_defeat(results: Vec<QueryResultList>, commands: GameCommandsArg) {
-    if let [game_manager_results, dead_player_results, ..] = &results[..] {
-        if !dead_player_results.is_empty() {
-            let mut game_manager = game_manager_results.get_only_mut::<GameManager>();
+    if let [not_game_over_game_manager_results, dead_player_results, ..] = &results[..] {
+        if !dead_player_results.is_empty() && !not_game_over_game_manager_results.is_empty() {
+            let mut game_manager = not_game_over_game_manager_results.get_only_mut::<GameManager>();
 
             game_manager.game_state = GameState::Defeat;
 

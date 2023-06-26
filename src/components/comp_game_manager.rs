@@ -28,14 +28,6 @@ impl GameManager {
         self.game_state == GameState::Paused
     }
 
-    pub fn did_win(&self) -> bool {
-        self.game_state == GameState::Victory
-    }
-
-    pub fn did_lose(&self) -> bool {
-        self.game_state == GameState::Defeat
-    }
-
     /// Game over is when the game state is either Victory or Defeat.
     pub fn is_game_over(&self) -> bool {
         match self.game_state {

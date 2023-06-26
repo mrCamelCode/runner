@@ -8,9 +8,8 @@ use thomas::{
 use crate::{
     add_defeat_text, add_paused_text, add_start_playing_text, add_victory_text,
     components::{GameManager, Player},
-    DEFEAT_TEXT_NAME, DISTANCE_MARKER_PIECE_NAME, EVENT_DEFEAT, EVENT_GAME_PAUSE_STATE_CHANGE,
-    EVENT_RESTART, EVENT_VICTORY, PAUSED_TEXT_NAME, PLAYER_DISPLAY, START_PLAYING_TEXT_NAME,
-    VICTORY_TEXT_NAME,
+    DEFEAT_TEXT_NAME, EVENT_DEFEAT, EVENT_GAME_PAUSE_STATE_CHANGE, EVENT_VICTORY, PAUSED_TEXT_NAME,
+    PLAYER_LIFE_DISPLAY, START_PLAYING_TEXT_NAME, VICTORY_TEXT_NAME,
 };
 
 const SCORE_TAG_ID: &str = "score-tag";
@@ -41,7 +40,7 @@ impl SystemsGenerator for HudSystemsGenerator {
                 EVENT_UPDATE,
                 System::new(
                     vec![
-                        Query::new().has_where::<GameManager>(|gm| gm.is_playing()),
+                        Query::new().has_where::<GameManager>(|gm| !gm.is_waiting_to_start()),
                         Query::new()
                             .has_where::<Identity>(|id| &id.name == START_PLAYING_TEXT_NAME),
                     ],
@@ -123,7 +122,7 @@ fn update_tags(results: Vec<QueryResultList>, _: GameCommandsArg) {
         lives_tag.value = format!(
             "Lives: {}",
             (0..player.lives)
-                .map(|_| String::from(PLAYER_DISPLAY))
+                .map(|_| String::from(PLAYER_LIFE_DISPLAY))
                 .collect::<Vec<String>>()
                 .join("")
         );

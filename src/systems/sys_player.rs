@@ -51,6 +51,21 @@ impl SystemsGenerator for PlayerSystemsGenerator {
                 EVENT_UPDATE,
                 System::new(
                     vec![
+                        Query::new().has::<Player>(),
+                        Query::new().has_where::<TerminalCollision>(|coll| {
+                            coll.is_collision_between(
+                                PLAYER_COLLISION_LAYER,
+                                PLAYER_COLLISION_LAYER,
+                            )
+                        }),
+                    ],
+                    handle_extra_life_collision,
+                ),
+            ),
+            (
+                EVENT_UPDATE,
+                System::new(
+                    vec![
                         Query::new().has_where::<GameManager>(|gm| gm.is_playing()),
                         Query::new().has::<Player>().has::<FollowCamera>(),
                     ],
@@ -77,7 +92,10 @@ impl SystemsGenerator for PlayerSystemsGenerator {
                 EVENT_UPDATE,
                 System::new_with_priority(
                     Priority::higher_than(&Priority::default()),
-                    vec![Query::new().has::<Player>()],
+                    vec![
+                        Query::new().has::<GameManager>(),
+                        Query::new().has::<Player>(),
+                    ],
                     update_velocity,
                 ),
             ),
@@ -175,18 +193,21 @@ fn apply_velocity(results: Vec<QueryResultList>, _: GameCommandsArg) {
 }
 
 fn update_velocity(results: Vec<QueryResultList>, _: GameCommandsArg) {
-    if let [player_results, ..] = &results[..] {
+    if let [game_manager_results, player_results, ..] = &results[..] {
+        let game_manager = game_manager_results.get_only::<GameManager>();
         let mut player = player_results.get_only_mut::<Player>();
 
-        if player.is_on_ground {
-            player.vertical_velocity = 0;
-            player.num_times_jumped_since_landing = 0;
-        } else if GRAVITY != 0
-            && player.gravity_timer.elapsed_millis() >= 1000 / i8::abs(GRAVITY) as u128
-        {
-            player.vertical_velocity += GRAVITY as i64;
+        if game_manager.is_playing() {
+            if player.is_on_ground {
+                player.vertical_velocity = 0;
+                player.num_times_jumped_since_landing = 0;
+            } else if GRAVITY != 0
+                && player.gravity_timer.elapsed_millis() >= 1000 / i8::abs(GRAVITY) as u128
+            {
+                player.vertical_velocity += GRAVITY as i64;
 
-            player.gravity_timer.restart();
+                player.gravity_timer.restart();
+            }
         }
     }
 }
@@ -206,17 +227,38 @@ fn handle_obstacle_collision(results: Vec<QueryResultList>, commands: GameComman
             let obstacle_entity = collision_results[0]
                 .components()
                 .get::<TerminalCollision>()
-                .bodies
-                .iter()
-                .find(|body| body.1.layer == OBSTACLE_COLLISION_LAYER)
-                .unwrap()
-                .0;
+                .get_entity_on_layer(OBSTACLE_COLLISION_LAYER)
+                .unwrap();
 
             player.lives = player.lives.saturating_sub(1);
 
             commands
                 .borrow_mut()
                 .issue(GameCommand::DestroyEntity(obstacle_entity));
+        }
+    }
+}
+
+fn handle_extra_life_collision(results: Vec<QueryResultList>, commands: GameCommandsArg) {
+    if let [player_results, collision_results, ..] = &results[..] {
+        if !collision_results.is_empty() {
+            let mut player = player_results.get_only_mut::<Player>();
+            let extra_life_entity = collision_results[0]
+                .components()
+                .get::<TerminalCollision>()
+                .bodies
+                .iter()
+                .find(|(entity, _)| entity != player_results[0].entity())
+                .unwrap()
+                .0;
+
+            if player.lives < MAX_LIVES {
+                player.lives += 1;
+            }
+
+            commands
+                .borrow_mut()
+                .issue(GameCommand::DestroyEntity(extra_life_entity));
         }
     }
 }

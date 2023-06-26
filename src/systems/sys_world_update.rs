@@ -1,33 +1,27 @@
-use std::{
-    collections::{HashMap, HashSet},
-    rc::Rc,
-};
+use std::collections::HashSet;
 
 use rand::{thread_rng, Rng};
 use thomas::{
-    Dimensions2d, GameCommand, GameCommandsArg, Identity, IntCoords2d, IntVector2, Layer, Lerp,
-    Matrix, Priority, Query, QueryResultList, Rgb, System, SystemsGenerator, TerminalCollider,
-    TerminalRenderer, TerminalRendererState, TerminalTransform, Timer, EVENT_INIT, EVENT_UPDATE,
+    GameCommand, GameCommandsArg, Identity, IntCoords2d, IntVector2, Lerp, Query, QueryResultList,
+    Rgb, System, SystemsGenerator, TerminalRenderer, TerminalRendererState, Timer, EVENT_UPDATE,
 };
 
 use crate::{
-    add_building, add_distance_marker,
     components::{
         FollowCamera, Player, SkylineBuilding, TimeOfDay, WorldTime, NOON_TIME, SUNRISE_TIME,
         SUNSET_TIME,
     },
-    get_color, BUILDING_PIECE_NAME, EVENT_TIME_OF_DAY_CHANGE, GROUND_COLLISION_LAYER,
-    PLAYER_X_OFFSET, PLAYER_Y_OFFSET, SCREEN_HEIGHT, SCREEN_WIDTH, SKY_COLORS,
-    SKY_COLOR_TRANSITION_TIMER_NAME, STAR_COLORS, STAR_COLOR_TRANSITION_TIMER_NAME, STAR_DISPLAY,
-    STAR_LAYER, STAR_NAME, SUN_COLORS, SUN_COLOR_TRANSITION_TIMER_NAME, SUN_ID, SUN_LAYER,
-    SUN_PIECE_NAME, WINDOW_COLOR_TRANSITION_TIMER_NAME, WINDOW_DISPLAY,
+    get_color, BUILDING_PIECE_NAME, EVENT_TIME_OF_DAY_CHANGE, SCREEN_HEIGHT, SCREEN_WIDTH,
+    SKY_COLORS, SKY_COLOR_TRANSITION_TIMER_NAME, STAR_COLORS, STAR_COLOR_TRANSITION_TIMER_NAME,
+    STAR_DISPLAY, STAR_NAME, SUN_COLORS, SUN_COLOR_TRANSITION_TIMER_NAME, SUN_ID, SUN_PIECE_NAME,
+    WINDOW_COLOR_TRANSITION_TIMER_NAME, WINDOW_DISPLAY,
 };
 
-const ADVANCE_TIME_WAIT_TIME_MILLIS: u128 = 1000;
+const ADVANCE_TIME_WAIT_TIME_MILLIS: u128 = 5000;
 
-const COLOR_TRANSITION_TIME_MILLIS: u128 = 800;
+const COLOR_TRANSITION_TIME_MILLIS: u128 = 5000;
 
-const WINDOW_TURN_OFF_TIME_MILLIS: u128 = 300;
+const WINDOW_TURN_OFF_TIME_MILLIS: u128 = 800;
 
 const SKYLINE_MOVE_INTERVAL: u64 = 200;
 
@@ -63,9 +57,6 @@ impl SystemsGenerator for WorldUpdateSystemsGenerator {
                             .has::<TerminalRenderer>(),
                         Query::new()
                             .has_where::<Identity>(|id| &id.name == SUN_PIECE_NAME)
-                            .has::<TerminalRenderer>(),
-                        Query::new()
-                            .has_where::<Identity>(|id| &id.name == BUILDING_PIECE_NAME)
                             .has::<TerminalRenderer>(),
                     ],
                     update_world_colors_from_time,
@@ -250,7 +241,7 @@ fn pick_window_index(
 }
 
 fn update_world_colors_from_time(results: Vec<QueryResultList>, _: GameCommandsArg) {
-    if let [world_time_results, terminal_renderer_state_results, stars_results, sun_pieces_results, building_pieces_results, ..] =
+    if let [world_time_results, terminal_renderer_state_results, stars_results, sun_pieces_results, ..] =
         &results[..]
     {
         let mut world_time = world_time_results.get_only_mut::<WorldTime>();

@@ -9,7 +9,7 @@ use thomas::{
 
 use crate::{
     add_building,
-    components::{FollowCamera, SkylineBuilding, WorldTime},
+    components::{FollowCamera, WorldTime},
     GROUND_COLLISION_LAYER, PLAYER_X_OFFSET, PLAYER_Y_OFFSET, SCREEN_HEIGHT, SCREEN_WIDTH,
     SKY_COLOR_TRANSITION_TIMER_NAME, STAR_COLOR_TRANSITION_TIMER_NAME, STAR_DISPLAY, STAR_LAYER,
     STAR_NAME, SUN_COLOR_TRANSITION_TIMER_NAME, SUN_ID, SUN_LAYER, SUN_PIECE_NAME,

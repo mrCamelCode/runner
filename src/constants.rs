@@ -18,6 +18,7 @@ pub const STAR_LAYER: Layer = Layer(-4);
 pub const SUN_LAYER: Layer = Layer(-3);
 
 pub const PLAYER_DISPLAY: char = '|';
+pub const PLAYER_LIFE_DISPLAY: char = '♥';
 pub const PLAYER_COLLISION_LAYER: Layer = Layer(1);
 pub const PLAYER_X_OFFSET: i64 = 10;
 pub const PLAYER_Y_OFFSET: i64 = 2;

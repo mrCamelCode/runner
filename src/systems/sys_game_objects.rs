@@ -2,21 +2,25 @@ use std::{ops::RangeInclusive, rc::Rc};
 
 use rand::{thread_rng, Rng};
 use thomas::{
-    GameCommand, GameCommandsArg, Identity, IntVector2, Priority, Query, QueryResult,
-    QueryResultList, System, SystemsGenerator, TerminalCamera, TerminalTransform, Timer, WorldText,
-    EVENT_INIT, EVENT_UPDATE,
+    GameCommand, GameCommandsArg, Identity, IntVector2, Query, QueryResult, QueryResultList,
+    System, SystemsGenerator, TerminalCamera, TerminalTransform, Timer, EVENT_INIT, EVENT_UPDATE,
 };
 
 use crate::{
     add_distance_marker,
-    components::{CleanupOnScreenExit, GameManager, GameObjectManager, Moveable, Player},
-    make_obstacle, ObstacleType, DISTANCE_MARKER_PIECE_NAME, EVENT_RESTART, OBSTACLE_NAME,
-    SCREEN_WIDTH,
+    components::{
+        CleanupOnScreenExit, FollowCamera, GameManager, GameObjectManager, Moveable, Player,
+    },
+    make_extra_life, make_obstacle, ObstacleType, BUILDING_PIECE_NAME, DISTANCE_MARKER_PIECE_NAME,
+    EVENT_RESTART, OBSTACLE_NAME,
 };
 
 const GENERATE_OBSTACLE_WAIT_TIME_MILLIS_RANGE: RangeInclusive<u128> = 250..=3000;
 
 const DISTANCE_MARKER_SPACING: u64 = 500;
+
+const GENERATE_PLAYER_LIFE_WAIT_TIME_MILLIS: u128 = 5000;
+const GENERATE_PLAYER_LIFE_CHANCE: u8 = 10;
 
 pub struct GameObjectsSystemsGenerator {}
 impl SystemsGenerator for GameObjectsSystemsGenerator {
@@ -34,6 +38,22 @@ impl SystemsGenerator for GameObjectsSystemsGenerator {
                             .has::<TerminalTransform>(),
                     ],
                     generate_obstacles,
+                ),
+            ),
+            (
+                EVENT_UPDATE,
+                System::new(
+                    vec![
+                        Query::new().has_where::<GameObjectManager>(|gom| {
+                            gom.extra_life_generation_timer.elapsed_millis()
+                                >= GENERATE_PLAYER_LIFE_WAIT_TIME_MILLIS
+                        }),
+                        Query::new().has::<GameManager>(),
+                        Query::new()
+                            .has_where::<TerminalCamera>(|cam| cam.is_main)
+                            .has::<TerminalTransform>(),
+                    ],
+                    generate_player_lives,
                 ),
             ),
             (
@@ -83,6 +103,9 @@ impl SystemsGenerator for GameObjectsSystemsGenerator {
                         Query::new().has_where::<Identity>(|id| &id.name == OBSTACLE_NAME),
                         Query::new()
                             .has_where::<Identity>(|id| &id.name == DISTANCE_MARKER_PIECE_NAME),
+                        Query::new()
+                            .has_where::<Identity>(|id| &id.name == BUILDING_PIECE_NAME)
+                            .has::<FollowCamera>(),
                     ],
                     handle_restart_game,
                 ),
@@ -96,6 +119,7 @@ fn make_obstacle_manager(_: Vec<QueryResultList>, commands: GameCommandsArg) {
         .borrow_mut()
         .issue(GameCommand::AddEntity(vec![Box::new(GameObjectManager {
             obstacle_generation_timer: Timer::start_new(),
+            extra_life_generation_timer: Timer::start_new(),
             scroll_timer: Timer::start_new(),
             next_obstacle_wait_time: thread_rng()
                 .gen_range(GENERATE_OBSTACLE_WAIT_TIME_MILLIS_RANGE),
@@ -108,24 +132,48 @@ fn generate_obstacles(results: Vec<QueryResultList>, commands: GameCommandsArg) 
         let game_manager = game_manager_results.get_only::<GameManager>();
         let main_cam_transform = main_cam_results.get_only::<TerminalTransform>();
 
-        if game_manager.is_playing()
-            && obstacle_manager.obstacle_generation_timer.elapsed_millis()
-                >= obstacle_manager.next_obstacle_wait_time
+        if obstacle_manager.obstacle_generation_timer.elapsed_millis()
+            >= obstacle_manager.next_obstacle_wait_time
         {
-            commands
-                .borrow_mut()
-                .issue(GameCommand::AddEntity(make_obstacle(
-                    &main_cam_transform,
-                    if thread_rng().gen_bool(0.5) {
-                        ObstacleType::Ground
-                    } else {
-                        ObstacleType::Air
-                    },
-                )));
+            if game_manager.is_playing() {
+                commands
+                    .borrow_mut()
+                    .issue(GameCommand::AddEntity(make_obstacle(
+                        &main_cam_transform,
+                        if thread_rng().gen_bool(0.5) {
+                            ObstacleType::Ground
+                        } else {
+                            ObstacleType::Air
+                        },
+                    )));
+            }
 
             obstacle_manager.obstacle_generation_timer.restart();
             obstacle_manager.next_obstacle_wait_time =
                 thread_rng().gen_range(GENERATE_OBSTACLE_WAIT_TIME_MILLIS_RANGE);
+        }
+    }
+}
+
+fn generate_player_lives(results: Vec<QueryResultList>, commands: GameCommandsArg) {
+    if let [generation_ready_game_object_manager_results, game_manager_results, main_cam_results, ..] =
+        &results[..]
+    {
+        if !generation_ready_game_object_manager_results.is_empty() {
+            let game_manager = game_manager_results.get_only::<GameManager>();
+            let mut game_object_manager =
+                generation_ready_game_object_manager_results.get_only_mut::<GameObjectManager>();
+            let main_cam_transform = main_cam_results.get_only::<TerminalTransform>();
+
+            let roll = thread_rng().gen_range(0..100 as u8);
+
+            if roll < GENERATE_PLAYER_LIFE_CHANCE && game_manager.is_playing() {
+                commands
+                    .borrow_mut()
+                    .issue(GameCommand::AddEntity(make_extra_life(&main_cam_transform)));
+            }
+
+            game_object_manager.extra_life_generation_timer.restart();
         }
     }
 }
@@ -180,7 +228,7 @@ fn move_moveable_obstacles(results: Vec<QueryResultList>, _: GameCommandsArg) {
 }
 
 fn handle_restart_game(results: Vec<QueryResultList>, commands: GameCommandsArg) {
-    if let [obstacle_results, distance_marker_results, ..] = &results[..] {
+    if let [obstacle_results, distance_marker_results, building_piece_results, ..] = &results[..] {
         let destroy = |result: &QueryResult| {
             commands
                 .borrow_mut()
@@ -189,5 +237,11 @@ fn handle_restart_game(results: Vec<QueryResultList>, commands: GameCommandsArg)
 
         obstacle_results.iter().for_each(destroy);
         distance_marker_results.iter().for_each(destroy);
+
+        for building_piece_result in building_piece_results {
+            let mut follow_cam = building_piece_result.components().get_mut::<FollowCamera>();
+
+            follow_cam.offset = IntVector2::zero();
+        }
     }
 }

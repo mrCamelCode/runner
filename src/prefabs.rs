@@ -1,18 +1,18 @@
-use std::{ops::RangeInclusive, rc::Rc};
+use std::ops::RangeInclusive;
 
 use rand::{thread_rng, Rng};
 use thomas::{
     Alignment, Component, Dimensions2d, GameCommand, GameCommandsArg, Identity, IntCoords2d,
     IntVector2, Layer, Matrix, Rgb, TerminalCollider, TerminalRenderer, TerminalTransform, Text,
-    Timer, UiAnchor, Vector2, WorldText,
+    Timer, UiAnchor, WorldText,
 };
 
 use crate::{
     components::{CleanupOnScreenExit, FollowCamera, Moveable, SkylineBuilding},
-    ALTERNATE_BUILDING_COLOR, BUILDING_COLOR, BUILDING_PIECE_NAME, DISTANCE_MARKER_PIECE_NAME,
-    OBSTACLE_BACKGROUND_COLOR, OBSTACLE_COLLISION_LAYER, OBSTACLE_NAME, PAUSED_TEXT_NAME,
-    PLAYER_Y_OFFSET, SCREEN_HEIGHT, SCREEN_WIDTH, SKYLINE_LAYER, START_PLAYING_TEXT_NAME,
-    VICTORY_TEXT_NAME, WINDOW_COLOR, DEFEAT_TEXT_NAME,
+    ALTERNATE_BUILDING_COLOR, BUILDING_COLOR, BUILDING_PIECE_NAME, DEFEAT_TEXT_NAME,
+    DISTANCE_MARKER_PIECE_NAME, OBSTACLE_BACKGROUND_COLOR, OBSTACLE_COLLISION_LAYER, OBSTACLE_NAME,
+    PAUSED_TEXT_NAME, PLAYER_COLLISION_LAYER, PLAYER_LIFE_DISPLAY, PLAYER_Y_OFFSET, SCREEN_HEIGHT,
+    SCREEN_WIDTH, SKYLINE_LAYER, START_PLAYING_TEXT_NAME, VICTORY_TEXT_NAME, WINDOW_COLOR,
 };
 
 const OBSTACLE_MOVE_INTERVAL_RANGE_MILLIS: RangeInclusive<u128> = 300..=800;
@@ -176,25 +176,54 @@ pub fn add_distance_marker(commands: GameCommandsArg, distance: u64) {
     ]))
 }
 
+pub fn make_extra_life(main_cam_transform: &TerminalTransform) -> Vec<Box<dyn Component>> {
+    vec![
+        Box::new(TerminalCollider {
+            is_active: true,
+            layer: PLAYER_COLLISION_LAYER,
+        }),
+        Box::new(TerminalRenderer {
+            display: PLAYER_LIFE_DISPLAY,
+            layer: Layer::base(),
+            background_color: None,
+            foreground_color: Some(Rgb(232, 23, 255)),
+        }),
+        Box::new(TerminalTransform {
+            coords: IntCoords2d::new(
+                main_cam_transform.coords.x() + SCREEN_WIDTH as i64 + 1,
+                SCREEN_HEIGHT as i64 - PLAYER_Y_OFFSET - 4,
+            ),
+        }),
+    ]
+}
+
 pub fn add_start_playing_text(commands: GameCommandsArg) {
     add_fullscreen_text(
         commands,
         "RUNNER",
-        "Press any key to start",
+        "Get 10,000 points to win!",
         START_PLAYING_TEXT_NAME,
+        Some("Press any key to start"),
     );
 }
 
 pub fn add_paused_text(commands: GameCommandsArg) {
-    add_fullscreen_text(commands, "PAUSED", "Press ESC to resume", PAUSED_TEXT_NAME);
+    add_fullscreen_text(
+        commands,
+        "PAUSED",
+        "Press ESC to resume",
+        PAUSED_TEXT_NAME,
+        Some("Press Ctrl+C to quit"),
+    );
 }
 
 pub fn add_victory_text(commands: GameCommandsArg) {
     add_fullscreen_text(
         commands,
         "VICTORY!",
-        "Press any key to play again",
+        "Press R to play again",
         VICTORY_TEXT_NAME,
+        None,
     );
 }
 
@@ -202,8 +231,9 @@ pub fn add_defeat_text(commands: GameCommandsArg) {
     add_fullscreen_text(
         commands,
         "DEFEAT",
-        "Press any key to play again",
+        "Press R to play again",
         DEFEAT_TEXT_NAME,
+        None,
     );
 }
 
@@ -212,6 +242,7 @@ fn add_fullscreen_text(
     top_text: &str,
     bottom_text: &str,
     text_name: &str,
+    extra_text_option: Option<&str>,
 ) {
     commands.borrow_mut().issue(GameCommand::AddEntity(vec![
         Box::new(Text {
@@ -242,4 +273,21 @@ fn add_fullscreen_text(
             name: String::from(text_name),
         }),
     ]));
+
+    if let Some(extra_text) = extra_text_option {
+        commands.borrow_mut().issue(GameCommand::AddEntity(vec![
+            Box::new(Text {
+                anchor: UiAnchor::MiddleBottom,
+                justification: Alignment::Middle,
+                offset: IntVector2::new(0, -2),
+                value: String::from(extra_text),
+                background_color: None,
+                foreground_color: Some(Rgb::white()),
+            }),
+            Box::new(Identity {
+                id: String::from(""),
+                name: String::from(text_name),
+            }),
+        ]));
+    }
 }

@@ -9,14 +9,11 @@ mod components;
 mod prefabs;
 pub use prefabs::*;
 
-use thomas::{
-    Dimensions2d, Game, GameCommand, GameOptions, Identity, IntCoords2d, Query, Renderer, Rgb,
-    System, TerminalRendererOptions, TerminalRendererState, Text,
-};
+use thomas::{Dimensions2d, Game, GameOptions, Renderer, TerminalRendererOptions};
 
 pub fn run() {
     Game::new(GameOptions {
-        max_frame_rate: 60,
+        max_frame_rate: 30,
         press_escape_to_quit: false,
     })
     .add_systems_from_generator(PlayerSystemsGenerator {})
