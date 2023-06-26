@@ -9,7 +9,7 @@ use thomas::{
 
 use crate::{
     add_building,
-    components::{FixedToCamera, SkylineBuilding, WorldTime},
+    components::{FollowCamera, SkylineBuilding, WorldTime},
     GROUND_COLLISION_LAYER, PLAYER_X_OFFSET, PLAYER_Y_OFFSET, SCREEN_HEIGHT, SCREEN_WIDTH,
     SKY_COLOR_TRANSITION_TIMER_NAME, STAR_COLOR_TRANSITION_TIMER_NAME, STAR_DISPLAY, STAR_LAYER,
     STAR_NAME, SUN_COLOR_TRANSITION_TIMER_NAME, SUN_ID, SUN_LAYER, SUN_PIECE_NAME,
@@ -41,7 +41,7 @@ fn make_sun(_: Vec<QueryResultList>, commands: GameCommandsArg) {
 
     commands.borrow_mut().issue(GameCommand::AddEntity(vec![
         Box::new(TerminalTransform { coords }),
-        Box::new(FixedToCamera {
+        Box::new(FollowCamera {
             base_position: coords,
             offset: IntCoords2d::zero(),
         }),
@@ -58,7 +58,7 @@ fn make_sun(_: Vec<QueryResultList>, commands: GameCommandsArg) {
             layer: SUN_LAYER,
         }),
         Box::new(TerminalTransform { coords: coords }),
-        Box::new(FixedToCamera {
+        Box::new(FollowCamera {
             base_position: coords,
             offset: IntCoords2d::zero(),
         }),
@@ -77,7 +77,7 @@ fn make_sun(_: Vec<QueryResultList>, commands: GameCommandsArg) {
         Box::new(TerminalTransform {
             coords: IntCoords2d::zero(),
         }),
-        Box::new(FixedToCamera {
+        Box::new(FollowCamera {
             base_position: coords,
             offset: IntCoords2d::zero(),
         }),
@@ -103,7 +103,7 @@ fn make_stars(_: Vec<QueryResultList>, commands: GameCommandsArg) {
                 background_color: None,
             }),
             Box::new(TerminalTransform { coords }),
-            Box::new(FixedToCamera {
+            Box::new(FollowCamera {
                 base_position: coords,
                 offset: IntCoords2d::zero(),
             }),
@@ -140,7 +140,7 @@ fn make_real_ground(commands: GameCommandsArg) {
 
     commands.borrow_mut().issue(GameCommand::AddEntity(vec![
         Box::new(TerminalTransform { coords: coords }),
-        Box::new(FixedToCamera {
+        Box::new(FollowCamera {
             base_position: coords,
             offset: IntCoords2d::zero(),
         }),
@@ -169,11 +169,10 @@ fn make_decorative_ground(commands: GameCommandsArg) {
                 foreground_color: None,
             }),
             Box::new(TerminalTransform { coords }),
-            Box::new(FixedToCamera {
+            Box::new(FollowCamera {
                 base_position: coords,
                 offset: IntCoords2d::zero(),
             }),
-            Box::new(SkylineBuilding {}),
         ]));
     }
 }

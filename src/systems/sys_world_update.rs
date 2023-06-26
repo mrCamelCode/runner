@@ -13,7 +13,7 @@ use thomas::{
 use crate::{
     add_building, add_distance_marker,
     components::{
-        FixedToCamera, Player, SkylineBuilding, TimeOfDay, WorldTime, NOON_TIME, SUNRISE_TIME,
+        FollowCamera, Player, SkylineBuilding, TimeOfDay, WorldTime, NOON_TIME, SUNRISE_TIME,
         SUNSET_TIME,
     },
     get_color, BUILDING_PIECE_NAME, EVENT_TIME_OF_DAY_CHANGE, GROUND_COLLISION_LAYER,
@@ -29,10 +29,25 @@ const COLOR_TRANSITION_TIME_MILLIS: u128 = 800;
 
 const WINDOW_TURN_OFF_TIME_MILLIS: u128 = 300;
 
+const SKYLINE_MOVE_INTERVAL: u64 = 200;
+
 pub struct WorldUpdateSystemsGenerator {}
 impl SystemsGenerator for WorldUpdateSystemsGenerator {
     fn generate(&self) -> Vec<(&'static str, System)> {
         vec![
+            (
+                EVENT_UPDATE,
+                System::new(
+                    vec![
+                        Query::new()
+                            .has_where::<Identity>(|id| &id.name == BUILDING_PIECE_NAME)
+                            .has::<FollowCamera>()
+                            .has::<SkylineBuilding>(),
+                        Query::new().has::<Player>(),
+                    ],
+                    move_skyline,
+                ),
+            ),
             (
                 EVENT_UPDATE,
                 System::new(vec![Query::new().has::<WorldTime>()], update_world_time),
@@ -44,13 +59,13 @@ impl SystemsGenerator for WorldUpdateSystemsGenerator {
                         Query::new().has::<WorldTime>(),
                         Query::new().has::<TerminalRendererState>(),
                         Query::new()
-                            .has_where::<Identity>(|identity| identity.name == STAR_NAME)
+                            .has_where::<Identity>(|id| id.name == STAR_NAME)
                             .has::<TerminalRenderer>(),
                         Query::new()
-                            .has_where::<Identity>(|identity| &identity.name == SUN_PIECE_NAME)
+                            .has_where::<Identity>(|id| &id.name == SUN_PIECE_NAME)
                             .has::<TerminalRenderer>(),
                         Query::new()
-                            .has_where::<Identity>(|identity| &identity.name == BUILDING_PIECE_NAME)
+                            .has_where::<Identity>(|id| &id.name == BUILDING_PIECE_NAME)
                             .has::<TerminalRenderer>(),
                     ],
                     update_world_colors_from_time,
@@ -62,7 +77,7 @@ impl SystemsGenerator for WorldUpdateSystemsGenerator {
                     vec![
                         Query::new().has::<WorldTime>(),
                         Query::new()
-                            .has_where::<Identity>(|identity| &identity.name == BUILDING_PIECE_NAME)
+                            .has_where::<Identity>(|id| &id.name == BUILDING_PIECE_NAME)
                             .has_where::<TerminalRenderer>(|renderer| renderer.display == ' '),
                     ],
                     turn_on_windows,
@@ -74,7 +89,7 @@ impl SystemsGenerator for WorldUpdateSystemsGenerator {
                     vec![
                         Query::new().has::<WorldTime>(),
                         Query::new()
-                            .has_where::<Identity>(|identity| &identity.name == BUILDING_PIECE_NAME)
+                            .has_where::<Identity>(|id| &id.name == BUILDING_PIECE_NAME)
                             .has_where::<TerminalRenderer>(|renderer| {
                                 renderer.display == WINDOW_DISPLAY
                             }),
@@ -88,21 +103,39 @@ impl SystemsGenerator for WorldUpdateSystemsGenerator {
                     vec![
                         Query::new().has::<WorldTime>(),
                         Query::new()
-                            .has_where::<Identity>(|identity| &identity.id == SUN_ID)
-                            .has::<FixedToCamera>(),
+                            .has_where::<Identity>(|id| &id.id == SUN_ID)
+                            .has::<FollowCamera>(),
                         Query::new()
-                            .has_where::<Identity>(|identity| &identity.name == SUN_PIECE_NAME)
-                            .has::<FixedToCamera>(),
+                            .has_where::<Identity>(|id| &id.name == SUN_PIECE_NAME)
+                            .has::<FollowCamera>(),
                     ],
                     update_sun_position,
                 ),
             ),
-            (EVENT_UPDATE, System::new(vec![], update_building_positions)),
         ]
     }
 }
 
-fn update_building_positions(results: Vec<QueryResultList>, commands: GameCommandsArg) {}
+fn move_skyline(results: Vec<QueryResultList>, _: GameCommandsArg) {
+    if let [skyline_piece_results, player_results, ..] = &results[..] {
+        let player = player_results.get_only::<Player>();
+
+        for skyline_piece_result in skyline_piece_results {
+            let mut skyline_building = skyline_piece_result
+                .components()
+                .get_mut::<SkylineBuilding>();
+            let mut follow_cam = skyline_piece_result.components().get_mut::<FollowCamera>();
+
+            if player.distance_traveled % SKYLINE_MOVE_INTERVAL == 0
+                && player.distance_traveled > skyline_building.last_distance_scrolled
+            {
+                follow_cam.offset += IntVector2::left();
+
+                skyline_building.last_distance_scrolled = player.distance_traveled;
+            }
+        }
+    }
+}
 
 fn update_world_time(results: Vec<QueryResultList>, commands: GameCommandsArg) {
     if let [world_time_results, ..] = &results[..] {
@@ -171,7 +204,7 @@ fn turn_off_windows(results: Vec<QueryResultList>, _: GameCommandsArg) {
             transition_timer.restart();
 
             let mut num_windows_to_turn_off = windows_results.len() / 3;
-            if num_windows_to_turn_off == 0 && windows_results.len() > 0 {
+            if num_windows_to_turn_off == 0 && !windows_results.is_empty() {
                 num_windows_to_turn_off = windows_results.len();
             }
 
@@ -322,9 +355,9 @@ fn blend_color_to_target(
 fn update_sun_position(results: Vec<QueryResultList>, _: GameCommandsArg) {
     if let [world_time_results, sun_results, sun_pieces_results, ..] = &results[..] {
         let world_time = world_time_results.get_only::<WorldTime>();
-        let mut sun_fixed_to_camera = sun_results.get_only_mut::<FixedToCamera>();
+        let mut sun_follow_cam = sun_results.get_only_mut::<FollowCamera>();
 
-        sun_fixed_to_camera.offset = IntCoords2d::new(
+        sun_follow_cam.offset = IntCoords2d::new(
             get_sun_x(world_time.current_time),
             get_sun_y(world_time.current_time),
         );
@@ -332,11 +365,9 @@ fn update_sun_position(results: Vec<QueryResultList>, _: GameCommandsArg) {
         for i in 0..sun_pieces_results.len() {
             let sun_piece_result = &sun_pieces_results[i];
 
-            let mut sun_piece_fixed_to_camera =
-                sun_piece_result.components().get_mut::<FixedToCamera>();
+            let mut sun_piece_follow_cam = sun_piece_result.components().get_mut::<FollowCamera>();
 
-            sun_piece_fixed_to_camera.offset =
-                sun_fixed_to_camera.offset + IntVector2::new(i as i64, 0);
+            sun_piece_follow_cam.offset = sun_follow_cam.offset + IntVector2::new(i as i64, 0);
         }
     }
 }

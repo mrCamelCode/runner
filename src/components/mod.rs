@@ -13,8 +13,11 @@ pub use comp_game_object_manager::*;
 mod comp_game_manager;
 pub use comp_game_manager::*;
 
-mod comp_fixed_to_camera;
-pub use comp_fixed_to_camera::*;
+mod comp_follow_camera;
+pub use comp_follow_camera::*;
 
 mod comp_cleanup_on_screen_exit;
 pub use comp_cleanup_on_screen_exit::*;
+
+mod comp_moveable;
+pub use comp_moveable::*;

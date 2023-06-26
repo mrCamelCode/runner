@@ -17,13 +17,13 @@ use thomas::{
 pub fn run() {
     Game::new(GameOptions {
         max_frame_rate: 60,
-        press_escape_to_quit: true,
+        press_escape_to_quit: false,
     })
     .add_systems_from_generator(PlayerSystemsGenerator {})
     .add_systems_from_generator(WorldSetupSystemsGenerator {})
     .add_systems_from_generator(WorldUpdateSystemsGenerator {})
     .add_systems_from_generator(GameManagerSystemsGenerator {})
-    .add_systems_from_generator(FixedToCameraSystemsGenerator {})
+    .add_systems_from_generator(FollowCameraSystemsGenerator {})
     .add_systems_from_generator(GameObjectsSystemsGenerator {})
     .add_systems_from_generator(HudSystemsGenerator {})
     .start(Renderer::Terminal(TerminalRendererOptions {

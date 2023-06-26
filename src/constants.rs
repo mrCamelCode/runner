@@ -4,14 +4,18 @@ use crate::components::TimeOfDay;
 
 pub type TimeOfDayColors = [(TimeOfDay, Option<Rgb>); 6];
 
+pub const SCREEN_HEIGHT: u16 = 12;
+pub const SCREEN_WIDTH: u16 = 80;
+
 pub const EVENT_TIME_OF_DAY_CHANGE: &str = "event-time-change";
+pub const EVENT_GAME_PAUSE_STATE_CHANGE: &str = "event-game-pause-change";
+pub const EVENT_VICTORY: &str = "event-victory";
+pub const EVENT_DEFEAT: &str = "event-defeat";
+pub const EVENT_RESTART: &str = "event-restart";
 
 pub const SKYLINE_LAYER: Layer = Layer(-2);
 pub const STAR_LAYER: Layer = Layer(-4);
 pub const SUN_LAYER: Layer = Layer(-3);
-
-pub const SCREEN_HEIGHT: u16 = 10;
-pub const SCREEN_WIDTH: u16 = 80;
 
 pub const PLAYER_DISPLAY: char = '|';
 pub const PLAYER_COLLISION_LAYER: Layer = Layer(1);
@@ -71,6 +75,13 @@ pub const SKY_COLOR_TRANSITION_TIMER_NAME: &str = "sky-color";
 pub const STAR_COLOR_TRANSITION_TIMER_NAME: &str = "star-color";
 pub const SUN_COLOR_TRANSITION_TIMER_NAME: &str = "sun-color";
 pub const WINDOW_COLOR_TRANSITION_TIMER_NAME: &str = "window-color";
+
+pub const START_PLAYING_TEXT_NAME: &str = "start-playing-text";
+pub const PAUSED_TEXT_NAME: &str = "paused-text";
+pub const VICTORY_TEXT_NAME: &str = "victory-text";
+pub const DEFEAT_TEXT_NAME: &str = "defeat-text";
+
+pub const GAME_VICTORY_SCORE: u64 = 10000;
 
 pub fn get_color<'a>(colors: &'a TimeOfDayColors, time_of_day: &TimeOfDay) -> &'a Option<Rgb> {
     &colors

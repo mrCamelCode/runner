@@ -3,10 +3,10 @@ use thomas::{
     TerminalTransform, EVENT_UPDATE,
 };
 
-use crate::components::FixedToCamera;
+use crate::components::FollowCamera;
 
-pub struct FixedToCameraSystemsGenerator {}
-impl SystemsGenerator for FixedToCameraSystemsGenerator {
+pub struct FollowCameraSystemsGenerator {}
+impl SystemsGenerator for FollowCameraSystemsGenerator {
     fn generate(&self) -> Vec<(&'static str, System)> {
         vec![(
             EVENT_UPDATE,
@@ -14,7 +14,7 @@ impl SystemsGenerator for FixedToCameraSystemsGenerator {
                 Priority::lowest(),
                 vec![
                     Query::new()
-                        .has::<FixedToCamera>()
+                        .has::<FollowCamera>()
                         .has::<TerminalTransform>(),
                     Query::new()
                         .has_where::<TerminalCamera>(|cam| cam.is_main)
@@ -31,13 +31,13 @@ fn update_positions(results: Vec<QueryResultList>, _: GameCommandsArg) {
         let main_cam_transform = main_camera_results.get_only::<TerminalTransform>();
 
         for fixed_entity_result in fixed_entities_results {
-            let fixed_to_camera = fixed_entity_result.components().get::<FixedToCamera>();
+            let follow_cam = fixed_entity_result.components().get::<FollowCamera>();
             let mut transform = fixed_entity_result
                 .components()
                 .get_mut::<TerminalTransform>();
 
             transform.coords =
-                fixed_to_camera.base_position + main_cam_transform.coords + fixed_to_camera.offset;
+                follow_cam.base_position + main_cam_transform.coords + follow_cam.offset;
         }
     }
 }

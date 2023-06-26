@@ -16,5 +16,5 @@ pub use sys_hud::*;
 mod sys_game_manager;
 pub use sys_game_manager::*;
 
-mod sys_fixed_to_camera;
-pub use sys_fixed_to_camera::*;
+mod sys_follow_camera;
+pub use sys_follow_camera::*;
